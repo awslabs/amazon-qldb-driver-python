@@ -12,7 +12,7 @@ Install the latest AmazonQLDB driver release via :command:`pip`::
 
 You may also install a specific version::
 
-    pip install pyqldb==0.1.0b
+    pip install pyqldb==1.0.0-rc.1
 
 
 Configuration
