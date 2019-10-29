@@ -1,0 +1,35 @@
+version: 0.2
+
+#env:
+  #variables:
+     # key: "There are no variables"
+  #parameter-store:
+     # key: "There are no variables"
+
+phases:
+  install:
+    #If you use the Ubuntu standard image 2.0 or later, you must specify runtime-versions.
+    #If you specify runtime-versions and use an image other than Ubuntu standard image 2.0, the build fails.
+    runtime-versions:
+       python: 3.7
+    #commands:
+      # - There are no build commands
+  pre_build:
+    commands:
+      - pip install -r requirements.txt
+      - pip install -e .
+  build:
+    commands:
+      - pytest
+  post_build:
+    commands:
+      - python setup.py sdist bdist_wheel
+#artifacts:
+  #files:
+    # - We don't currently preserve any artifacts
+  #name: $(date +%Y-%m-%d)
+  #discard-paths: yes
+  #base-directory: location
+#cache:
+  #paths:
+    # - We don't currently cache anything
