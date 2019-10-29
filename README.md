@@ -7,7 +7,7 @@ to write software that makes use of AmazonQLDB.
 
 ### Basic Configuration
 
-You need to set up your AWS security credentials and config before the driver is able to connect to AWS. 
+You need to set up your AWS security credentials and config before the driver is able to connect to AWS.
 
 Set up credentials (in e.g. `~/.aws/credentials`):
 
@@ -76,8 +76,6 @@ You can run the unit tests with this command:
 $ pytest --cov-report term-missing --cov=pyqldb
 ```
 
-The performance tests have a separate README.md within the performance folder.
-
 ### Documentation 
 
 Sphinx is used for documentation. You can generate HTML locally with the following:
@@ -90,6 +88,10 @@ $ make html
 ```
 
 ## Release Notes
+
+### Release 1.0.0-rc.2 (October 29, 2019)
+
+Fixes for small documentation issues.
 
 ### Release 1.0.0-rc.1 (October 28, 2019)
 
