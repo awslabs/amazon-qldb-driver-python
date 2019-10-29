@@ -30,6 +30,7 @@ setuptools.setup(
     version=get_version(),
     description='Python driver for Amazon QLDB',
     long_description=open('README.md').read(),
+    long_description_content_type='text/markdown',
     author='Amazon Web Services',
     packages=setuptools.find_packages(),
     install_requires=requires,
