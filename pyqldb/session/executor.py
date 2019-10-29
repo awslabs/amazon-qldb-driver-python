@@ -1,0 +1,52 @@
+# Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance with
+# the License. A copy of the License is located at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+# CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
+# and limitations under the License.
+from logging import getLogger
+
+from ..errors import LambdaAbortedError
+
+logger = getLogger(__name__)
+
+
+class Executor:
+    """
+    A class to handle lambda execution.
+
+    :type transaction: :py:class:`pyqldb.transaction.transaction.Transaction`
+    :param transaction: The transaction that this executor is running within.
+    """
+    def __init__(self, transaction):
+        self._transaction = transaction
+
+    def abort(self):
+        """
+        Abort the transaction and roll back any changes.
+
+        :raises LambdaAbortedError: When invoked.
+        """
+        raise LambdaAbortedError
+
+    def execute_statement(self, statement, parameters=[]):
+        """
+        Execute the statement.
+
+        :type statement: str
+        :param statement: The statement to execute.
+
+        :type parameters: list
+        :param parameters: Optional list of Ion values to fill in parameters of the statement.
+
+        :rtype: :py:class:`pyqldb.cursor.stream_cursor.StreamCursor`
+        :return: Cursor on the result set of the statement.
+
+        :raises TransactionClosedError: When this transaction is closed.
+        """
+        cursor = self._transaction.execute_statement(statement, parameters)
+        return cursor
