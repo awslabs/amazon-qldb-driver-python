@@ -1,7 +1,11 @@
 # AmazonQLDB Python Driver
 
-This is the Python driver for Amazon Quantum Ledger Database (QLDB), which allows Python developers
+This is the Python driver for [Amazon Quantum Ledger Database (QLDB)](https://aws.amazon.com/qldb/), which allows Python developers
 to write software that makes use of AmazonQLDB.
+
+[![Documentation Status](https://readthedocs.org/projects/amazon-qldb-driver-python/badge/?version=latest)](https://amazon-qldb-driver-python.readthedocs.io/en/latest/?badge=latest)
+
+For our tutorial, see [Python and Amazon QLDB](https://docs.aws.amazon.com/qldb/latest/developerguide/getting-started.python.html).
 
 ## Requirements
 
