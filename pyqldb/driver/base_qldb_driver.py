@@ -107,8 +107,8 @@ class BaseQldbDriver(ABC):
 
             if region_name is not None or aws_access_key_id is not None or aws_secret_access_key is not None or \
                     aws_session_token is not None:
-                logger.warning('Custom parameters were detected while using a specified Boto3 client and will be '
-                               'ignored. Please preconfigure the Boto3 client with those parameters instead.')
+                logger.warning('Custom parameters (region_name or aws_access_key_id or aws_secret_access_key or aws_session_token) '
+                               'were detected while using a specified Boto3 client and will be ignored because boto3_session parameter has priority. ')
 
             self._client = boto3_session.client(SERVICE_NAME, verify=verify, endpoint_url=endpoint_url,
                                                 config=self._config)
