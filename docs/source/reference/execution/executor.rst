@@ -2,7 +2,7 @@
 Executor Reference
 ==================
 
-.. automodule:: pyqldb.session.executor
+.. automodule:: pyqldb.execution.executor
    :members:
    :undoc-members:
 

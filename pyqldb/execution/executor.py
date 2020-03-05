@@ -33,20 +33,23 @@ class Executor:
         """
         raise LambdaAbortedError
 
-    def execute_statement(self, statement, parameters=[]):
+    def execute_statement(self, statement, *parameters):
         """
         Execute the statement.
 
         :type statement: str
         :param statement: The statement to execute.
 
-        :type parameters: list
-        :param parameters: Optional list of Ion values to fill in parameters of the statement.
+        :type parameters: Variable length argument list
+        :param parameters: Ion values or Python native types that are convertible to Ion for filling in parameters
+                           of the statement.
+
+                           `Details on conversion support and rules <https://ion-python.readthedocs.io/en/latest/amazon.ion.html?highlight=simpleion#module-amazon.ion.simpleion>`_.
 
         :rtype: :py:class:`pyqldb.cursor.stream_cursor.StreamCursor`
         :return: Cursor on the result set of the statement.
 
         :raises TransactionClosedError: When this transaction is closed.
         """
-        cursor = self._transaction.execute_statement(statement, parameters)
+        cursor = self._transaction.execute_statement(statement, *parameters)
         return cursor

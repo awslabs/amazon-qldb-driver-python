@@ -11,7 +11,7 @@
 from unittest import TestCase
 from unittest.mock import call, patch
 
-from amazon.ion.simpleion import loads
+from amazon.ion.simpleion import dumps, loads
 from botocore.exceptions import ClientError
 
 from pyqldb.errors import IllegalStateError, TransactionClosedError
@@ -22,7 +22,13 @@ MOCK_ERROR_CODE = '500'
 MOCK_ERROR_MESSAGE = 'foo'
 MOCK_CLIENT_ERROR_MESSAGE = {'Error': {'Code': MOCK_ERROR_CODE, 'Message': MOCK_ERROR_MESSAGE}}
 MOCK_ID = '123'
-MOCK_PARAMETERS = [loads('a'), loads('b')]
+MOCK_PARAMETER_1 = loads('a')
+MOCK_PARAMETER_2 = loads('b')
+INVALID_MOCK_PARAMETER = bytearray(1)
+NATIVE_PARAMETER_1 = 1
+NATIVE_PARAMETER_2 = True
+ION_PARAMETER_1 = loads(dumps(NATIVE_PARAMETER_1))
+ION_PARAMETER_2 = loads(dumps(NATIVE_PARAMETER_2))
 MOCK_READ_AHEAD = 0
 MOCK_STATEMENT = 'SELECT * FROM FOO'
 MOCK_STATEMENT_RESULT = {'Values': [], 'NextPageToken': 'token'}
@@ -199,8 +205,8 @@ class TestTransaction(TestCase):
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
         cursor = transaction.execute_statement(MOCK_STATEMENT)
 
-        mock_session.execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, [])
-        mock_update_hash.assert_called_once_with(MOCK_STATEMENT, [])
+        mock_session.execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, ())
+        mock_update_hash.assert_called_once_with(MOCK_STATEMENT, ())
         mock_cursor.assert_called_once_with(MOCK_STATEMENT_RESULT, mock_session, MOCK_ID)
         self.assertEqual(transaction._cursors, [mock_cursor])
         self.assertEqual(cursor, mock_cursor)
@@ -215,8 +221,8 @@ class TestTransaction(TestCase):
         transaction = Transaction(mock_session, 2, MOCK_ID, mock_executor)
         cursor = transaction.execute_statement(MOCK_STATEMENT)
 
-        mock_session.execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, [])
-        mock_update_hash.assert_called_once_with(MOCK_STATEMENT, [])
+        mock_session.execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, ())
+        mock_update_hash.assert_called_once_with(MOCK_STATEMENT, ())
         mock_cursor.assert_called_once_with(MOCK_STATEMENT_RESULT, mock_session, MOCK_ID, 2, mock_executor)
         self.assertEqual(transaction._cursors, [mock_cursor])
         self.assertEqual(cursor, mock_cursor)
@@ -229,13 +235,38 @@ class TestTransaction(TestCase):
         mock_cursor.return_value = mock_cursor
         mock_session.execute_statement.return_value = MOCK_FIRST_PAGE_RESULT
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
-        cursor = transaction.execute_statement(MOCK_STATEMENT, MOCK_PARAMETERS)
+        cursor = transaction.execute_statement(MOCK_STATEMENT, MOCK_PARAMETER_1, MOCK_PARAMETER_2)
 
-        mock_session.execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, MOCK_PARAMETERS)
-        mock_update_hash.assert_called_once_with(MOCK_STATEMENT, MOCK_PARAMETERS)
+        mock_session.execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, (MOCK_PARAMETER_1,
+                                                               MOCK_PARAMETER_2))
+        mock_update_hash.assert_called_once_with(MOCK_STATEMENT, (MOCK_PARAMETER_1, MOCK_PARAMETER_2))
         mock_cursor.assert_called_once_with(MOCK_STATEMENT_RESULT, mock_session, MOCK_ID)
         self.assertEqual(transaction._cursors, [mock_cursor])
         self.assertEqual(cursor, mock_cursor)
+
+    @patch('concurrent.futures.thread.ThreadPoolExecutor')
+    @patch('pyqldb.transaction.transaction.Transaction._update_hash')
+    @patch('pyqldb.transaction.transaction.StreamCursor')
+    def test_execute_statement_with_native_parameters(self, mock_cursor, mock_update_hash, mock_executor, mock_session):
+        mock_update_hash.return_value = None
+        mock_cursor.return_value = mock_cursor
+        mock_session.execute_statement.return_value = MOCK_FIRST_PAGE_RESULT
+        transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
+        cursor = transaction.execute_statement(MOCK_STATEMENT, NATIVE_PARAMETER_1, NATIVE_PARAMETER_2)
+
+        mock_session.execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, (ION_PARAMETER_1,
+                                                               ION_PARAMETER_1))
+        mock_update_hash.assert_called_once_with(MOCK_STATEMENT, (ION_PARAMETER_1, ION_PARAMETER_2))
+        mock_cursor.assert_called_once_with(MOCK_STATEMENT_RESULT, mock_session, MOCK_ID)
+        self.assertEqual(transaction._cursors, [mock_cursor])
+        self.assertEqual(cursor, mock_cursor)
+
+    @patch('concurrent.futures.thread.ThreadPoolExecutor')
+    def test_execute_statement_with_invalid_parameters(self, mock_executor, mock_session):
+        transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
+        
+        with self.assertRaises(TypeError):
+            transaction.execute_statement(MOCK_STATEMENT, INVALID_MOCK_PARAMETER)
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
     def test_execute_statement_when_closed(self, mock_executor, mock_session):
@@ -264,10 +295,10 @@ class TestTransaction(TestCase):
     def test_update_hash(self, mock_to_qldb_hash, mock_executor, mock_session):
         mock_to_qldb_hash.return_value = mock_to_qldb_hash
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
-        transaction._update_hash(MOCK_STATEMENT, MOCK_PARAMETERS)
+        transaction._update_hash(MOCK_STATEMENT, (MOCK_PARAMETER_1, MOCK_PARAMETER_2))
 
-        mock_to_qldb_hash.assert_has_calls([call(MOCK_ID), call(MOCK_STATEMENT), call(MOCK_PARAMETERS[0]),
-                                            call(MOCK_PARAMETERS[1])], any_order=True)
+        mock_to_qldb_hash.assert_has_calls([call(MOCK_ID), call(MOCK_STATEMENT), call(MOCK_PARAMETER_1),
+                                            call(MOCK_PARAMETER_2)], any_order=True)
         self.assertEqual(transaction._txn_hash, mock_to_qldb_hash.dot())
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')

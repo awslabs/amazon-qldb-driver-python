@@ -23,7 +23,7 @@ MOCK_ERROR_CODE = '200'
 MOCK_ERROR_MESSAGE = 'error_message'
 MOCK_ID = 'id'
 MOCK_LEDGER_NAME = 'ledger name'
-MOCK_PARAMETERS = ['parameter1', 'parameter2']
+MOCK_PARAMETERS = ('parameter1', 'parameter2')
 MOCK_STATEMENT = 'statement'
 MOCK_TRANSACTION_ID = 'transaction_id'
 MOCK_TOKEN = 'token'
@@ -197,7 +197,7 @@ class TestSessionClient(TestCase):
         mock_client.return_value = mock_client
         mock_send_command.return_value = MOCK_START_TRANSACTION_RESULT
         session = SessionClient(MOCK_LEDGER_NAME, MOCK_TOKEN, mock_client, MOCK_ID)
-        result = session.start_transaction()
+        result = session.start_transaction().get('TransactionId')
 
         self.assertEqual(result, MOCK_TRANSACTION_ID)
         mock_send_command.assert_called_once_with({'SessionToken': MOCK_TOKEN, 'StartTransaction': {}})

@@ -10,12 +10,14 @@
 # and limitations under the License.
 from logging import getLogger
 
+from amazon.ion.simpleion import dumps, loads
 from botocore.exceptions import ClientError
 
 from ..cursor.read_ahead_cursor import ReadAheadCursor
 from ..cursor.stream_cursor import StreamCursor
 from ..errors import IllegalStateError, TransactionClosedError, is_occ_conflict_exception
 from ..util.qldb_hash import QldbHash
+
 
 logger = getLogger(__name__)
 
@@ -54,6 +56,7 @@ class Transaction:
     :type executor: :py:class:`concurrent.futures.thread.ThreadPoolExecutor`
     :param executor: The executor to be used by the retrieval thread.
     """
+
     def __init__(self, session, read_ahead, transaction_id, executor):
         self._session = session
         self._read_ahead = read_ahead
@@ -114,7 +117,7 @@ class Transaction:
 
         :raises TransactionClosedError: When this transaction is closed.
 
-        :raises ClientError: When there is an error communicating with QLDB.
+        :raises ClientError: When there is an error communicating against QLDB.
         """
         if self._is_closed:
             raise TransactionClosedError
@@ -133,26 +136,32 @@ class Transaction:
         finally:
             self._internal_close()
 
-    def execute_statement(self, statement, parameters=[]):
+    def execute_statement(self, statement, *parameters):
         """
         Execute the statement.
 
         :type statement: str/function
         :param statement: The statement to execute.
 
-        :type parameters: list
-        :param parameters: Optional list of Ion values to fill in parameters of the statement.
+        :type parameters: Variable length argument list
+        :param parameters: Ion values or Python native types that are convertible to Ion for filling in parameters
+                           of the statement.
+
+                           `Details on conversion support and rules <https://ion-python.readthedocs.io/en/latest/amazon.ion.html?highlight=simpleion#module-amazon.ion.simpleion>`_.
 
         :rtype: :py:class:`pyqldb.cursor.stream_cursor`/object
         :return: Cursor on the result set of the statement.
 
         :raises TransactionClosedError: When this transaction is closed.
 
-        :raises ClientError: When there is an error communicating with QLDB.
+        :raises ClientError: When there is an error executing against QLDB.
+
+        :raises TypeError: When conversion of native data type (in parameters) to Ion fails due to an unsupported type.
         """
         if self._is_closed:
             raise TransactionClosedError
 
+        parameters = tuple(map(self._to_ion, parameters))
         self._update_hash(statement, parameters)
         statement_result = self._session.execute_statement(self._id, statement, parameters)
         first_page = statement_result.get('FirstPage')
@@ -182,3 +191,18 @@ class Transaction:
             statement_hash = statement_hash.dot(QldbHash.to_qldb_hash(param))
 
         self._txn_hash = self._txn_hash.dot(statement_hash)
+
+    @staticmethod
+    def _to_ion(obj):
+        """
+        Check if the object is of Ion type; if not, convert to Ion.
+
+        :raises TypeError in case conversion fails.
+        """
+        if not hasattr(obj, "ion_annotations"):
+            try:
+                obj = loads(dumps(obj))
+            except TypeError:
+                raise TypeError("Failed to convert parameter to Ion; unsupported data type: %r" % (type(obj)))
+
+        return obj

@@ -23,13 +23,16 @@ MOCK_LEDGER_NAME = 'QLDB'
 MOCK_LIST_TABLES_RESULT = ['Vehicle', 'Person']
 MOCK_LIST_TABLES_RESULT_STRING = ['Vehicle', 'Person']
 MOCK_MESSAGE = 'foo'
-MOCK_PARAMETERS = [loads(MOCK_MESSAGE)]
+MOCK_PARAMETER_1 = loads(MOCK_MESSAGE)
+MOCK_PARAMETER_2 = loads("MOCK_MESSAGE_2")
 MOCK_RESULT = {'StartSession': {'SessionToken': 'token'}}
 MOCK_RETRY_LIMIT = 4
 MOCK_READ_AHEAD = 0
 MOCK_SLEEP_CAP_MS = 5000
 MOCK_SLEEP_BASE_MS = 10
 MOCK_STATEMENT = 'CREATE TABLE unittest'
+MOCK_TRANSACTION_ID = 'transaction_id'
+MOCK_TRANSACTION_RESULT = {'TransactionId': MOCK_TRANSACTION_ID}
 MOCK_CLIENT_ERROR_MESSAGE = {'Error': {'Code': MOCK_ERROR_CODE, 'Message': MOCK_MESSAGE}}
 
 
@@ -118,10 +121,11 @@ class TestQldbSession(TestCase):
     @patch('pyqldb.communication.session_client.SessionClient')
     @patch('pyqldb.session.qldb_session.QldbSession.execute_lambda')
     def test_execute_statement(self, mock_execute_lambda, mock_session, mock_executor):
+        retry_indicator = Mock()
         mock_execute_lambda.return_value = mock_execute_lambda
         qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor)
-        result = qldb_session.execute_statement(MOCK_STATEMENT, MOCK_PARAMETERS)
-
+        result = qldb_session.execute_statement(MOCK_STATEMENT, MOCK_PARAMETER_1, MOCK_PARAMETER_2,
+                                                retry_indicator=retry_indicator)
         mock_execute_lambda.assert_called_once()
         self.assertEqual(result, mock_execute_lambda)
 
@@ -358,12 +362,12 @@ class TestQldbSession(TestCase):
     def test_start_transaction(self, mock_session, mock_transaction, mock_throw_if_closed, mock_executor):
         qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor)
         mock_transaction.return_value = mock_transaction
-        mock_session.start_transaction.return_value = MOCK_ID
+        mock_session.start_transaction.return_value = MOCK_TRANSACTION_RESULT
         transaction = qldb_session.start_transaction()
 
         mock_throw_if_closed.assert_called_once_with()
         mock_session.start_transaction.assert_called_once_with()
-        mock_transaction.assert_called_once_with(qldb_session._session, qldb_session._read_ahead, MOCK_ID,
+        mock_transaction.assert_called_once_with(qldb_session._session, qldb_session._read_ahead, MOCK_TRANSACTION_ID,
                                                  mock_executor)
         self.assertEqual(transaction, mock_transaction)
 

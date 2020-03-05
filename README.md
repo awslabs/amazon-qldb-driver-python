@@ -41,7 +41,7 @@ for table in qldb_session.list_tables():
 ### See Also
 
 1. [Amazon QLDB Python Driver Tutorial](https://docs.aws.amazon.com/qldb/latest/developerguide/getting-started.python.tutorial.html): In this tutorial, you use the QLDB Driver for Python to create an Amazon QLDB ledger and populate it with tables and sample data.
-2. [Amazon QLDB Python Driver Samples](https://github.com/awslabs/amazon-qldb-driver-python): A DMV based example application which demonstrates how to use QLDB with the QLDB Driver for Python.
+2. [Amazon QLDB Python Driver Samples](https://github.com/aws-samples/amazon-qldb-dmv-sample-python): A DMV based example application which demonstrates how to use QLDB with the QLDB Driver for Python.
 3. QLDB Python driver accepts and returns [Amazon ION](http://amzn.github.io/ion-docs/) Documents. Amazon Ion is a richly-typed, self-describing, hierarchical data serialization format offering interchangeable binary and text representations. For more information read the [ION docs](https://readthedocs.org/projects/ion-python/).
 4. Amazon QLDB supports the [PartiQL](https://partiql.org/) query language. PartiQL provides SQL-compatible query access across multiple data stores containing structured data, semistructured data, and nested data. For more information read the [PartiQL docs](https://partiql.org/docs.html).
 5. Refer the section [Common Errors while using the Amazon QLDB Drivers](https://docs.aws.amazon.com/qldb/latest/developerguide/driver-errors.html) which describes runtime errors that can be thrown by the Amazon QLDB Driver when calling the qldb-session APIs.
@@ -55,7 +55,7 @@ like this instead of the `pip install pyqldb` defined above:
 
 ```
 $ git clone https://github.com/awslabs/amazon-qldb-driver-python
-$ cd driver
+$ cd amazon-qldb-driver-python
 $ virtualenv venv
 ...
 $ . venv/bin/activate
@@ -83,6 +83,18 @@ $ make html
 ```
 
 ## Release Notes
+
+### Release 2.0.0
+
+#### New features:
+* Added Execute methods to PooledQldbDriver
+* Added support for python native types for [execute_statement](https://amazon-qldb-driver-python.readthedocs.io/en/latest/reference/session/pooled_qldb_session.html#pyqldb.session.pooled_qldb_session.PooledQldbSession.execute_statement) parameters
+
+#### Unavoidable breaking changes:
+* In order to be more pythonic, the method signature of [execute_statement](https://amazon-qldb-driver-python.readthedocs.io/en/latest/reference/session/pooled_qldb_session.html#pyqldb.session.pooled_qldb_session.PooledQldbSession.execute_statement) has 
+been changed to receive *args. This is a breaking change for any application 
+that uses 1.0.0-rc.2 version of the driver. Starting v2.0, applications should 
+pass execute_statement parameters as comma separated arguments instead of passing them as a list.
 
 ### Release 1.0.0-rc.2 (October 29, 2019)
 

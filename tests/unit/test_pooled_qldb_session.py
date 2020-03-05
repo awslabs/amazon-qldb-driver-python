@@ -19,7 +19,8 @@ from pyqldb.errors import SessionClosedError
 MOCK_LEDGER_NAME = 'ledger name'
 MOCK_SESSION_TOKEN = 'session token'
 MOCK_STATEMENT = 'statement'
-MOCK_PARAMETERS = 'parameters'
+MOCK_PARAMETER_1 = 'parameter_1'
+MOCK_PARAMETER_2 = 'parameter_2'
 MOCK_ERROR_CODE = 500
 MOCK_MESSAGE = 'foo'
 
@@ -105,7 +106,8 @@ class TestPooledQldbSession(TestCase):
         retry_indicator = Mock()
         mock_invoke_on_session.return_value = mock_invoke_on_session
         pooled_qldb_session = PooledQldbSession(mock_qldb_session, mock_release_session)
-        result = pooled_qldb_session.execute_statement(MOCK_STATEMENT, MOCK_PARAMETERS, retry_indicator)
+        result = pooled_qldb_session.execute_statement(MOCK_STATEMENT, MOCK_PARAMETER_1, MOCK_PARAMETER_2,
+                                                       retry_indicator=retry_indicator)
         mock_invoke_on_session.assert_called_once()
         self.assertEqual(result, mock_invoke_on_session)
 

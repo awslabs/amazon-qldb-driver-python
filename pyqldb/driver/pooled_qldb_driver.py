@@ -13,6 +13,7 @@ from logging import getLogger
 from threading import BoundedSemaphore
 
 from ..errors import DriverClosedError, SessionPoolEmptyError
+from ..execution.executable import Executable
 from ..session.pooled_qldb_session import PooledQldbSession
 from ..util.atomic_integer import AtomicInteger
 from .base_qldb_driver import BaseQldbDriver
@@ -21,7 +22,7 @@ logger = getLogger(__name__)
 DEFAULT_TIMEOUT_SECONDS = 30
 
 
-class PooledQldbDriver(BaseQldbDriver):
+class PooledQldbDriver(BaseQldbDriver, Executable):
     """
     Represents a factory for accessing pooled sessions to a specific ledger within QLDB. This class or
     :py:class:`pyqldb.driver.qldb_driver.QldbDriver` should be the main entry points to any interaction with QLDB.
@@ -132,6 +133,64 @@ class PooledQldbDriver(BaseQldbDriver):
         while not self._pool.empty():
             cur_session = self._pool.get_nowait()
             cur_session.close()
+
+    def execute_statement(self, statement, *parameters, retry_indicator=lambda execution_attempt: None):
+        """
+        Execute the statement using the specified parameters against QLDB and retrieve the result.
+
+        :type statement: str
+        :param statement: The statement to execute.
+
+        :type parameters: Variable length argument list
+        :param parameters: Ion values or Python native types that are convertible to Ion for filling in parameters
+                           of the statement.
+
+                           `Details on conversion support and rules <https://ion-python.readthedocs.io/en/latest/amazon.ion.html?highlight=simpleion#module-amazon.ion.simpleion>`_.
+
+        :type retry_indicator: function
+        :param retry_indicator: Optional function called when the transaction execution is about to be retried due to an
+                                OCC conflict or retriable exception.
+
+        :rtype: :py:class:`pyqldb.cursor.buffered_cursor.BufferedCursor`
+        :return: Fully buffered Cursor on the result set of the statement.
+
+        :raises DriverClosedError: When this driver is closed.
+
+        :raises IllegalStateError: When the commit digest from commit transaction result does not match.
+
+        :raises ClientError: When there is an error executing against QLDB.
+        """
+        with self.get_session() as session:
+            return session.execute_statement(statement, *parameters, retry_indicator=retry_indicator)
+
+    def execute_lambda(self, query_lambda, retry_indicator=lambda execution_attempt: None):
+        """
+        Execute the lambda function against QLDB within a transaction and retrieve the result.
+
+        :type query_lambda: function
+        :param query_lambda: The lambda function to execute. A lambda function cannot have any side effects as
+                             it may be invoked multiple times, and the result cannot be trusted until the transaction is
+                             committed.
+
+        :type retry_indicator: function
+        :param retry_indicator: Optional function called when the transaction execution is about to be retried due to an
+                                OCC conflict or retriable exception.
+
+        :rtype: :py:class:`pyqldb.cursor.buffered_cursor.BufferedCursor`/object
+        :return: The return value of the lambda function which could be a
+                 :py:class:`pyqldb.cursor.buffered_cursor.BufferedCursor` on the result set of a statement within the
+                 lambda.
+
+        :raises DriverClosedError: When this driver is closed.
+
+        :raises IllegalStateError: When the commit digest from commit transaction result does not match.
+
+        :raises ClientError: When there is an error executing against QLDB.
+
+        :raises LambdaAbortedError: If the lambda function calls :py:class:`pyqldb.execution.executor.Executor.abort`.
+        """
+        with self.get_session() as session:
+            return session.execute_lambda(query_lambda, retry_indicator)
 
     def get_session(self):
         """

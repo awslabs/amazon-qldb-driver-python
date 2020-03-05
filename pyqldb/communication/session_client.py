@@ -16,8 +16,6 @@ from amazon.ion.simple_types import IonPyBool, IonPyBytes, IonPyDecimal, IonPyDi
 from amazon.ion.simpleion import dumps
 from botocore.exceptions import ClientError
 
-IonValue = (IonPyBool, IonPyBytes, IonPyDecimal, IonPyDict, IonPyFloat, IonPyInt, IonPyList, IonPyNull, IonPySymbol,
-            IonPyText, IonPyTimestamp)
 logger = getLogger(__name__)
 
 
@@ -186,13 +184,12 @@ class SessionClient:
         """
         Send request to start a transaction.
 
-        :rtype: str
-        :return: The transaction ID.
+        :rtype: dict
+        :return: The start transaction response.
         """
         request = {'SessionToken': self.token, 'StartTransaction': {}}
         result = self._send_command(request)
-        transaction_id = result.get('StartTransaction').get('TransactionId')
-        return transaction_id
+        return result.get('StartTransaction')
 
     def _send_command(self, request):
         """

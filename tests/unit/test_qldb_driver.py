@@ -11,8 +11,8 @@
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-from botocore.config import Config
 from boto3.session import Session
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from pyqldb.driver.qldb_driver import QldbDriver
