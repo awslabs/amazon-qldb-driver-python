@@ -47,7 +47,7 @@ class PooledQldbSession(BaseQldbSession):
             self._is_closed = True
             self._return_session_to_pool(self._qldb_session)
 
-    def execute_statement(self, statement, parameters=[], retry_indicator=lambda execution_attempt: None):
+    def execute_statement(self, statement, *parameters, retry_indicator=lambda execution_attempt: None):
         """
         Calls :py:meth:`pyqldb.session.qldb_session.QldbSession.execute_statement` to implicitly start a transaction,
         execute the statement, and commit the transaction, retrying up to the retry limit if an OCC conflict or
@@ -61,8 +61,11 @@ class PooledQldbSession(BaseQldbSession):
         :type statement: str
         :param statement: The statement to execute.
 
-        :type parameters: list
-        :param parameters: Optional list of Ion values to fill in parameters of the statement.
+        :type parameters: Variable length argument list
+        :param parameters: Ion values or Python native types that are convertible to Ion for filling in parameters
+                           of the statement.
+
+                           `Details on conversion support and rules <https://ion-python.readthedocs.io/en/latest/amazon.ion.html?highlight=simpleion#module-amazon.ion.simpleion>`_.
 
         :type retry_indicator: function
         :param retry_indicator: Optional function called when the transaction execution is about to be retried due to an
@@ -76,10 +79,13 @@ class PooledQldbSession(BaseQldbSession):
 
         :raises SessionClosedError: When this session is closed.
 
-        :raises ClientError: When there is an error communicating with QLDB.
+        :raises ClientError: When there is an error executing against QLDB.
+
+        :raises TypeError: When conversion of native data type (in parameters) to Ion fails due to an unsupported type.
         """
-        return self._invoke_on_session(lambda: self._qldb_session.execute_statement(statement, parameters,
-                                                                                    retry_indicator))
+        return self._invoke_on_session(lambda: self._qldb_session.execute_statement(statement, *parameters,
+                                                                                    retry_indicator=retry_indicator
+                                                                                    ))
 
     def execute_lambda(self, query_lambda, retry_indicator=lambda execution_attempt: None):
         """
@@ -110,7 +116,9 @@ class PooledQldbSession(BaseQldbSession):
 
         :raises SessionClosedError: When this session is closed.
 
-        :raises ClientError: When there is an error communicating with QLDB.
+        :raises ClientError: When there is an error executing against QLDB.
+
+        :raises LambdaAbortedError: If the lambda function calls :py:class:`pyqldb.execution.executor.Executor.abort`.
         """
         return self._invoke_on_session(lambda: self._qldb_session.execute_lambda(query_lambda, retry_indicator))
 

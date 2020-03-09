@@ -19,8 +19,8 @@ from ..errors import is_invalid_session_exception, is_occ_conflict_exception, is
 from ..communication.session_client import SessionClient
 from ..cursor.buffered_cursor import BufferedCursor
 from ..cursor.stream_cursor import StreamCursor
+from ..execution.executor import Executor
 from ..transaction.transaction import Transaction
-from ..session.executor import Executor
 from .base_qldb_session import BaseQldbSession
 
 
@@ -105,7 +105,7 @@ class QldbSession(BaseQldbSession):
             self._is_closed = True
             self._session.close()
 
-    def execute_statement(self, statement, parameters=[], retry_indicator=lambda execution_attempt: None):
+    def execute_statement(self, statement, *parameters, retry_indicator=lambda execution_attempt: None):
         """
         Implicitly start a transaction, execute the statement, and commit the transaction, retrying up to the retry
         limit if an OCC conflict or retriable exception occurs.
@@ -118,8 +118,11 @@ class QldbSession(BaseQldbSession):
         :type statement: str
         :param statement: The statement to execute.
 
-        :type parameters: list
-        :param parameters: Optional list of Ion values to fill in parameters of the statement.
+        :type parameters: Variable length argument list
+        :param parameters: Ion values or Python native types that are convertible to Ion for filling in parameters
+                           of the statement.
+
+                           `Details on conversion support and rules <https://ion-python.readthedocs.io/en/latest/amazon.ion.html?highlight=simpleion#module-amazon.ion.simpleion>`_.
 
         :type retry_indicator: function
         :param retry_indicator: Optional function called when the transaction execution is about to be retried due to an
@@ -132,9 +135,11 @@ class QldbSession(BaseQldbSession):
 
         :raises SessionClosedError: When this session is closed.
 
-        :raises ClientError: When there is an error communicating with QLDB.
+        :raises ClientError: When there is an error executing against QLDB.
+
+        :raises TypeError: When conversion of native data type (in parameters) to Ion fails due to an unsupported type.
         """
-        return self.execute_lambda(lambda executor: executor.execute_statement(statement, parameters), retry_indicator)
+        return self.execute_lambda(lambda executor: executor.execute_statement(statement, *parameters), retry_indicator)
 
     def execute_lambda(self, query_lambda, retry_indicator=lambda execution_attempt: None):
         """
@@ -164,7 +169,9 @@ class QldbSession(BaseQldbSession):
 
         :raises SessionClosedError: When this session is closed.
 
-        :raises ClientError: When there is an error communicating with QLDB.
+        :raises ClientError: When there is an error executing against QLDB.
+
+        :raises LambdaAbortedError: If the lambda function calls :py:class:`pyqldb.execution.executor.Executor.abort`.
         """
         self.throw_if_closed()
 
@@ -223,7 +230,7 @@ class QldbSession(BaseQldbSession):
         """
         self.throw_if_closed()
 
-        transaction_id = self._session.start_transaction()
+        transaction_id = self._session.start_transaction().get('TransactionId')
         transaction = Transaction(self._session, self._read_ahead, transaction_id, self._executor)
         return transaction
 

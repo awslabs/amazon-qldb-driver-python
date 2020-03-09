@@ -12,12 +12,13 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from pyqldb.errors import LambdaAbortedError
-from pyqldb.session.executor import Executor
+from pyqldb.execution.executor import Executor
 
 MOCK_ERROR_CODE = '500'
 MOCK_MESSAGE = 'foo'
 MOCK_STATEMENT = 'SELECT * FROM foo'
-MOCK_PARAMS = ['foo', 'bar']
+MOCK_PARAMETER_1 = 'foo'
+MOCK_PARAMETER_2 = 'bar'
 MOCK_CLIENT_ERROR_MESSAGE = {'Error': {'Code': MOCK_ERROR_CODE, 'Message': MOCK_MESSAGE}}
 
 
@@ -39,6 +40,6 @@ class TestExecutor(TestCase):
         mock_transaction.execute_statement.return_value = mock_cursor
         executor = Executor(mock_transaction)
 
-        cursor = executor.execute_statement(MOCK_STATEMENT, MOCK_PARAMS)
-        mock_transaction.execute_statement.assert_called_once_with(MOCK_STATEMENT, MOCK_PARAMS)
+        cursor = executor.execute_statement(MOCK_STATEMENT, MOCK_PARAMETER_1, MOCK_PARAMETER_2)
+        mock_transaction.execute_statement.assert_called_once_with(MOCK_STATEMENT, MOCK_PARAMETER_1, MOCK_PARAMETER_2)
         self.assertEqual(cursor, mock_cursor)

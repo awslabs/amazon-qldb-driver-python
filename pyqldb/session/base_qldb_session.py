@@ -10,8 +10,10 @@
 # and limitations under the License.
 from abc import ABC, abstractmethod
 
+from ..execution.executable import Executable
 
-class BaseQldbSession(ABC):
+
+class BaseQldbSession(Executable, ABC):
     """
     An abstract base class representing a session to a specific ledger within QLDB.
     """
@@ -47,22 +49,6 @@ class BaseQldbSession(ABC):
     def close(self):
         """
         Close this QldbSession. This method must be overridden.
-        """
-        pass
-
-    @abstractmethod
-    def execute_statement(self, statement, parameters, retry_indicator):
-        """
-        Implicitly start a transaction, execute the statement, and commit the transaction, retrying up to the
-        retry limit if an OCC conflict or retriable exception occurs. This method must be overridden.
-        """
-        pass
-
-    @abstractmethod
-    def execute_lambda(self, query_lambda, retry_indicator):
-        """
-        Implicitly start a transaction, execute the lambda function, and commit the transaction, retrying up to the
-        retry limit if an OCC conflict or retriable exception occurs. This method must be overridden.
         """
         pass
 

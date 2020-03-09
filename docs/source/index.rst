@@ -52,6 +52,13 @@ Errors
 
    reference/errors/errors
 
+Execution
+~~~~~~~~~
+
+.. toctree::
+   :maxdepth: 3
+
+   reference/execution/index
 
 Session
 ~~~~~~~
