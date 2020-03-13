@@ -13,11 +13,11 @@ For our tutorial, see [Python and Amazon QLDB](https://docs.aws.amazon.com/qldb/
 
 See [Accessing Amazon QLDB](https://docs.aws.amazon.com/qldb/latest/developerguide/accessing.html) for information on connecting to AWS.
 
-### Python 3.x
+### Python 3.4 or later
 
-The driver requires Python 3.x. Please see the link below for more detail to install Python 3.x:
+The driver requires Python 3.4 or later. Please see the link below for more detail to install Python:
 
-* [Python 3.x Installation](https://www.python.org/downloads/)
+* [Python Installation](https://www.python.org/downloads/)
 
 ## Getting Started
 
