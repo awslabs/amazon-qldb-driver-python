@@ -84,6 +84,11 @@ $ make html
 
 ## Release Notes
 
+### Release 2.0.1
+
+* Fixed README to reflect the correct minimum python version required.
+The driver requires Python 3.4 or later, earlier it was mentioned to be 3.x
+
 ### Release 2.0.0
 
 #### New features:
