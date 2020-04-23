@@ -1,3 +1,5 @@
+.. _reference_driver:
+
 =================
 Driver References
 =================

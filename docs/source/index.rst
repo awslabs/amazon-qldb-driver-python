@@ -8,81 +8,38 @@ AmazonQLDB Driver Documentation
 This is the Python driver for Amazon Quantum Ledger Database (QLDB), which allows Python developers
 to write software that makes use of AmazonQLDB.
 
-Quickstart
-----------
+Installation
+------------
 
 .. toctree::
    :maxdepth: 2
 
-   guide/quickstart
+   guide/installation
 
+
+Getting Started
+---------------
+
+.. toctree::
+   :maxdepth: 2
+
+   guide/getting_started
+
+Cookbook
+--------
+
+.. toctree::
+   :maxdepth: 2
+
+   guide/cookbook
 
 API Reference
 -------------
 
-Communication
-~~~~~~~~~~~~~
-
 .. toctree::
    :maxdepth: 3
 
-   reference/communication/session_client
-
-Cursor
-~~~~~~
-
-.. toctree::
-   :maxdepth: 3
-
-   reference/cursor/index
-
-Driver
-~~~~~~
-
-.. toctree::
-   :maxdepth: 3
-
-   reference/driver/index
-
-Errors
-~~~~~~
-
-.. toctree::
-   :maxdepth: 3
-
-   reference/errors/errors
-
-Execution
-~~~~~~~~~
-
-.. toctree::
-   :maxdepth: 3
-
-   reference/execution/index
-
-Session
-~~~~~~~
-
-.. toctree::
-   :maxdepth: 3
-
-   reference/session/index
-
-Transaction
-~~~~~~~~~~~
-
-.. toctree::
-   :maxdepth: 3
-
-   reference/transaction/transaction
-
-Util
-~~~~
-
-.. toctree::
-   :maxdepth: 3
-
-   reference/util/index
+   reference/index
 
 Indices and tables
 ==================

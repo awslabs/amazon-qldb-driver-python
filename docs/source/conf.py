@@ -87,12 +87,19 @@ pygments_style = 'sphinx'
 #modindex_common_prefix = []
 
 
-import guzzle_sphinx_theme
+# These paths are either relative to html_static_path
+# or fully qualified paths (eg. https://...)
+html_css_files = [
+    'css/custom.css',
+]
 
-extensions.append("guzzle_sphinx_theme")
-html_translator_class = 'guzzle_sphinx_theme.HTMLTranslator'
-html_theme_path = guzzle_sphinx_theme.html_theme_path()
-html_theme = 'guzzle_sphinx_theme'
+import sphinx_rtd_theme
+
+extensions.append("sphinx_rtd_theme")
+html_translator_class = 'sphinx_rtd_theme.HTMLTranslator'
+
+html_theme = 'sphinx_rtd_theme'
+html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 # Guzzle theme options (see theme.conf for more information)
 
 html_theme_options = {
