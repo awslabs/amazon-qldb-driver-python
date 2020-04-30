@@ -37,7 +37,7 @@ Reading Documents
 *****************
 
 .. code-block:: python
-    :emphasize-lines: 6-17,26
+    :emphasize-lines: 6-18,27
     :lineno-start: 1
 
     # the first argument will be an instance of Executor which is a
@@ -56,7 +56,8 @@ Reading Documents
             print(doc["GovId"])
             print(doc["FirstName"])
 
-        # Transaction committed implicitly on return, no need to explicitly commit transaction
+        # Transaction committed implicitly on return,
+        # no need to explicitly commit transaction
 
     # pyqldb.driver.pooled_qldb_driver.PooledQldbDriver.execute_lambda accepts
     # a function that receives instance of :py:class:`pyqldb.execution.executor.Executor`
@@ -81,13 +82,14 @@ Inserting Documents
 *******************
 
 .. code-block:: python
-    :emphasize-lines: 1-18,28
+    :emphasize-lines: 1-19,30
     :lineno-start: 1
 
     def insert_documents(transaction_executor, arg_1):
         # Check if doc with GovId:TOYENC486FH exists
         # This is critical to make this transaction idempotent
-        cursor = transaction_executor.execute_statement("SELECT * FROM Person WHERE GovId = ?", "TOYENC486FH")
+        query = "SELECT * FROM Person WHERE GovId = ?", "TOYENC486FH"
+        cursor = transaction_executor.execute_statement(query)
         # Check if there is any record in the cursor
         first_record = next(cursor, None)
 
@@ -97,9 +99,9 @@ Inserting Documents
         else:
 
             # Note : arg_1 here is a native python dict. QLDB supports Amazon Ion
-            # documents. So before being sent to QLDB execute_statement will first convert
-            # any non Ion datatype to Ion using amazon.ion.simpleion module.
-            # https://ion-python.readthedocs.io/en/latest/_modules/amazon/ion/simpleion.html
+            # documents.
+            # So before being sent to QLDB execute_statement will first convert any non
+            # Ion datatype to Ion using amazon.ion.simpleion module.
 
             transaction_executor.execute_statement("INSERT INTO Person ?", arg_1)
 
