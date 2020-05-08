@@ -22,7 +22,7 @@ logger = getLogger(__name__)
 DEFAULT_TIMEOUT_SECONDS = 30
 
 
-class PooledQldbDriver(BaseQldbDriver, Executable):
+class PooledQldbDriver(BaseQldbDriver):
     """
     Represents a factory for accessing pooled sessions to a specific ledger within QLDB. This class or
     :py:class:`pyqldb.driver.qldb_driver.QldbDriver` should be the main entry points to any interaction with QLDB.
@@ -134,34 +134,20 @@ class PooledQldbDriver(BaseQldbDriver, Executable):
             cur_session = self._pool.get_nowait()
             cur_session.close()
 
-    def execute_statement(self, statement, *parameters, retry_indicator=lambda execution_attempt: None):
+    def list_tables(self):
         """
-        Execute the statement using the specified parameters against QLDB and retrieve the result.
-
-        :type statement: str
-        :param statement: The statement to execute.
-
-        :type parameters: Variable length argument list
-        :param parameters: Ion values or Python native types that are convertible to Ion for filling in parameters
-                           of the statement.
-
-                           `Details on conversion support and rules <https://ion-python.readthedocs.io/en/latest/amazon.ion.html?highlight=simpleion#module-amazon.ion.simpleion>`_.
-
-        :type retry_indicator: function
-        :param retry_indicator: Optional function called when the transaction execution is about to be retried due to an
-                                OCC conflict or retriable exception.
+        Get the list of table names in the ledger.
 
         :rtype: :py:class:`pyqldb.cursor.buffered_cursor.BufferedCursor`
-        :return: Fully buffered Cursor on the result set of the statement.
+        :return: Iterable of table names in :py:class:`amazon.ion.simple_types.IonPyText`.
 
         :raises DriverClosedError: When this driver is closed.
-
-        :raises IllegalStateError: When the commit digest from commit transaction result does not match.
-
-        :raises ClientError: When there is an error executing against QLDB.
         """
-        with self.get_session() as session:
-            return session.execute_statement(statement, *parameters, retry_indicator=retry_indicator)
+        cursor = self.execute_lambda(lambda txn:
+                                     txn.execute_statement(
+                                         "SELECT VALUE name FROM information_schema.user_tables WHERE status = 'ACTIVE'"))
+
+        return cursor
 
     def execute_lambda(self, query_lambda, retry_indicator=lambda execution_attempt: None):
         """

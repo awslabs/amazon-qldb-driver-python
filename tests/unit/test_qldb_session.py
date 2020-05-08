@@ -20,17 +20,12 @@ from pyqldb.session.qldb_session import QldbSession
 MOCK_ERROR_CODE = '500'
 MOCK_ID = 'mock_id'
 MOCK_LEDGER_NAME = 'QLDB'
-MOCK_LIST_TABLES_RESULT = ['Vehicle', 'Person']
-MOCK_LIST_TABLES_RESULT_STRING = ['Vehicle', 'Person']
 MOCK_MESSAGE = 'foo'
-MOCK_PARAMETER_1 = loads(MOCK_MESSAGE)
-MOCK_PARAMETER_2 = loads("MOCK_MESSAGE_2")
 MOCK_RESULT = {'StartSession': {'SessionToken': 'token'}}
 MOCK_RETRY_LIMIT = 4
 MOCK_READ_AHEAD = 0
 MOCK_SLEEP_CAP_MS = 5000
 MOCK_SLEEP_BASE_MS = 10
-MOCK_STATEMENT = 'CREATE TABLE unittest'
 MOCK_TRANSACTION_ID = 'transaction_id'
 MOCK_TRANSACTION_RESULT = {'TransactionId': MOCK_TRANSACTION_ID}
 MOCK_CLIENT_ERROR_MESSAGE = {'Error': {'Code': MOCK_ERROR_CODE, 'Message': MOCK_MESSAGE}}
@@ -116,18 +111,6 @@ class TestQldbSession(TestCase):
 
         self.assertTrue(qldb_session._is_closed)
         mock_session.close.assert_called_once_with()
-
-    @patch('concurrent.futures.thread.ThreadPoolExecutor')
-    @patch('pyqldb.communication.session_client.SessionClient')
-    @patch('pyqldb.session.qldb_session.QldbSession.execute_lambda')
-    def test_execute_statement(self, mock_execute_lambda, mock_session, mock_executor):
-        retry_indicator = Mock()
-        mock_execute_lambda.return_value = mock_execute_lambda
-        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor)
-        result = qldb_session.execute_statement(MOCK_STATEMENT, MOCK_PARAMETER_1, MOCK_PARAMETER_2,
-                                                retry_indicator=retry_indicator)
-        mock_execute_lambda.assert_called_once()
-        self.assertEqual(result, mock_execute_lambda)
 
     @patch('pyqldb.session.qldb_session.QldbSession.throw_if_closed')
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
@@ -338,22 +321,6 @@ class TestQldbSession(TestCase):
 
         self.assertRaises(LambdaAbortedError, qldb_session.execute_lambda, mock_lambda, retry_indicator)
         mock_no_throw_abort.assert_called_once_with(mock_transaction)
-
-    @patch('concurrent.futures.thread.ThreadPoolExecutor')
-    @patch('pyqldb.communication.session_client.SessionClient')
-    @patch('pyqldb.session.qldb_session.QldbSession.execute_statement')
-    def test_list_tables(self, mock_execute_statement, mock_session, mock_executor):
-        mock_execute_statement.return_value = MOCK_LIST_TABLES_RESULT
-        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor)
-        table_names = qldb_session.list_tables()
-
-        count = 0
-        for result in table_names:
-            self.assertEqual(result, MOCK_LIST_TABLES_RESULT_STRING[count])
-            count += 1
-
-        mock_execute_statement.assert_called_once_with("SELECT VALUE name FROM information_schema.user_tables WHERE status "
-                                                   "= 'ACTIVE'")
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
     @patch('pyqldb.session.qldb_session.QldbSession.throw_if_closed')
