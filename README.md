@@ -73,6 +73,10 @@ You can run the unit tests with this command:
 $ pytest --cov-report term-missing --cov=pyqldb
 ```
 
+You can run the integration tests with this command:
+```
+$ pytest tests/integration
+```
 ### Documentation 
 
 Sphinx is used for documentation. You can generate HTML locally with the following:

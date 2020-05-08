@@ -18,9 +18,6 @@ from pyqldb.errors import SessionClosedError
 
 MOCK_LEDGER_NAME = 'ledger name'
 MOCK_SESSION_TOKEN = 'session token'
-MOCK_STATEMENT = 'statement'
-MOCK_PARAMETER_1 = 'parameter_1'
-MOCK_PARAMETER_2 = 'parameter_2'
 MOCK_ERROR_CODE = 500
 MOCK_MESSAGE = 'foo'
 
@@ -102,35 +99,12 @@ class TestPooledQldbSession(TestCase):
     @patch('pyqldb.session.pooled_qldb_session.PooledQldbSession._invoke_on_session')
     @patch('pyqldb.driver.pooled_qldb_driver.PooledQldbDriver._release_session')
     @patch('pyqldb.session.qldb_session.QldbSession')
-    def test_execute_statement(self, mock_qldb_session, mock_release_session, mock_invoke_on_session):
-        retry_indicator = Mock()
-        mock_invoke_on_session.return_value = mock_invoke_on_session
-        pooled_qldb_session = PooledQldbSession(mock_qldb_session, mock_release_session)
-        result = pooled_qldb_session.execute_statement(MOCK_STATEMENT, MOCK_PARAMETER_1, MOCK_PARAMETER_2,
-                                                       retry_indicator=retry_indicator)
-        mock_invoke_on_session.assert_called_once()
-        self.assertEqual(result, mock_invoke_on_session)
-
-    @patch('pyqldb.session.pooled_qldb_session.PooledQldbSession._invoke_on_session')
-    @patch('pyqldb.driver.pooled_qldb_driver.PooledQldbDriver._release_session')
-    @patch('pyqldb.session.qldb_session.QldbSession')
     def test_execute_lambda(self, mock_qldb_session, mock_release_session, mock_invoke_on_session):
         retry_indicator = Mock()
         mock_lambda = Mock()
         mock_invoke_on_session.return_value = mock_invoke_on_session
         pooled_qldb_session = PooledQldbSession(mock_qldb_session, mock_release_session)
         result = pooled_qldb_session.execute_lambda(mock_lambda, retry_indicator)
-        mock_invoke_on_session.assert_called_once()
-        self.assertEqual(result, mock_invoke_on_session)
-
-    @patch('pyqldb.session.pooled_qldb_session.PooledQldbSession._invoke_on_session')
-    @patch('pyqldb.driver.pooled_qldb_driver.PooledQldbDriver._release_session')
-    @patch('pyqldb.session.qldb_session.QldbSession')
-    def test_list_tables(self, mock_qldb_session, mock_release_session, mock_invoke_on_session):
-        mock_invoke_on_session.return_value = mock_invoke_on_session
-        pooled_qldb_session = PooledQldbSession(mock_qldb_session, mock_release_session)
-        result = pooled_qldb_session.list_tables()
-
         mock_invoke_on_session.assert_called_once()
         self.assertEqual(result, mock_invoke_on_session)
 

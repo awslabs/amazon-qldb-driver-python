@@ -136,6 +136,21 @@ class BaseQldbDriver(ABC):
         """
         pass
 
+    @abstractmethod
+    def execute_lambda(self, query_lambda, retry_indicator):
+        """
+        Implicitly start a transaction, execute the lambda function, and commit the transaction, retrying up to the
+        retry limit if an OCC conflict or retriable exception occurs. This method must be overridden.
+        """
+        pass
+
+    @abstractmethod
+    def list_tables(self):
+        """
+        Get the list of table names in the ledger. This method must be overridden.
+        """
+        pass
+
     @property
     def read_ahead(self):
         """

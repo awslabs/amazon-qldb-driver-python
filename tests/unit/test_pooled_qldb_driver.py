@@ -30,9 +30,7 @@ MOCK_CONFIG = Config()
 MOCK_LEDGER_NAME = 'QLDB'
 MOCK_MESSAGE = 'message'
 MOCK_BOTO3_SESSION = Session()
-MOCK_STATEMENT = 'CREATE TABLE unittest'
-MOCK_PARAMETER_1 = loads(MOCK_MESSAGE)
-MOCK_PARAMETER_2 = loads('MOCK_MESSAGE_2')
+MOCK_LIST_TABLES_RESULT = ['Vehicle', 'Person']
 
 
 class TestPooledQldbDriver(TestCase):
@@ -442,21 +440,18 @@ class TestPooledQldbDriver(TestCase):
         self.assertEqual(driver.retry_limit, driver._retry_limit)
 
     @patch('pyqldb.driver.base_qldb_driver.client')
-    @patch('pyqldb.driver.pooled_qldb_driver.PooledQldbDriver.get_session')
-    def test_execute_statement(self, mock_get_session, mock_client):
+    @patch('pyqldb.driver.pooled_qldb_driver.PooledQldbDriver.execute_lambda')
+    def test_list_tables(self, mock_execute_lambda, mock_client):
         mock_client.return_value = mock_client
-        retry_indicator = Mock()
-        mock_session = mock_get_session.return_value.__enter__.return_value
-        mock_session.execute_statement.return_value = MOCK_MESSAGE
+        mock_execute_lambda.return_value = MOCK_LIST_TABLES_RESULT
 
         driver = PooledQldbDriver(MOCK_LEDGER_NAME)
-        result = driver.execute_statement(MOCK_STATEMENT, MOCK_PARAMETER_1, MOCK_PARAMETER_2,
-                                          retry_indicator=retry_indicator)
+        table_names = driver.list_tables()
 
-        mock_get_session.assert_called_once_with()
-        mock_session.execute_statement.assert_called_once_with(MOCK_STATEMENT, MOCK_PARAMETER_1, MOCK_PARAMETER_2,
-                                                               retry_indicator=retry_indicator)
-        self.assertEqual(result, MOCK_MESSAGE)
+        count = 0
+        for result in table_names:
+            self.assertEqual(result, MOCK_LIST_TABLES_RESULT[count])
+            count += 1
 
     @patch('pyqldb.driver.base_qldb_driver.client')
     @patch('pyqldb.driver.pooled_qldb_driver.PooledQldbDriver.get_session')

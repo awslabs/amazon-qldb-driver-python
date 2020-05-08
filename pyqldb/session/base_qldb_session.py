@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from ..execution.executable import Executable
 
 
-class BaseQldbSession(Executable, ABC):
+class BaseQldbSession(ABC):
     """
     An abstract base class representing a session to a specific ledger within QLDB.
     """
@@ -53,15 +53,16 @@ class BaseQldbSession(Executable, ABC):
         pass
 
     @abstractmethod
-    def list_tables(self):
+    def start_transaction(self):
         """
-        Get the list of table names in the ledger. This method must be overridden.
+        Start a transaction using an available database session. This method must be overridden.
         """
         pass
 
     @abstractmethod
-    def start_transaction(self):
+    def execute_lambda(self, query_lambda, retry_indicator):
         """
-        Start a transaction using an available database session. This method must be overridden.
+        Implicitly start a transaction, execute the lambda function, and commit the transaction, retrying up to the
+        retry limit if an OCC conflict or retriable exception occurs. This method must be overridden.
         """
         pass

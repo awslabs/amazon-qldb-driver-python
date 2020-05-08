@@ -160,5 +160,3 @@ Using OCC, transactions in QLDB don't acquire locks on database resources and op
 Before committing, each transaction performs a validation check to ensure that no other committed transaction has modified the snapshot of data that it's accessing. If this check reveals conflicting modifications, or the state of the data snapshot changes, the committing transaction is rejected. However, the transaction can be restarted.
 
 When a transaction writes to QLDB, the validation checks of the OCC model are implemented by QLDB itself. If a transaction can't be written to the journal due to a failure in the verification phase of OCC, QLDB returns an OccConflictException to the application layer. The application software is responsible for ensuring that the transaction is restarted. The application should abort the rejected transaction and then retry the whole transaction from the start.
-
-When a transaction is rejected an QLDB throws an OccConflictException.
