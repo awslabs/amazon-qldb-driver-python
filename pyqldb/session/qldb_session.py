@@ -16,31 +16,29 @@ from botocore.exceptions import ClientError
 
 from ..errors import is_invalid_session_exception, is_occ_conflict_exception, is_retriable_exception, \
     SessionClosedError, LambdaAbortedError, StartTransactionError
-from ..communication.session_client import SessionClient
 from ..cursor.buffered_cursor import BufferedCursor
 from ..cursor.stream_cursor import StreamCursor
 from ..execution.executor import Executor
 from ..transaction.transaction import Transaction
-from .base_qldb_session import BaseQldbSession
 
 
 logger = getLogger(__name__)
 SLEEP_CAP_MS = 5000
 SLEEP_BASE_MS = 10
 
-
-class QldbSession(BaseQldbSession):
+class QldbSession():
     """
+    The QldbSession is meant for internal use only.
     A class representing a session to a QLDB ledger for interacting with QLDB. A QldbSession is linked to the specified
     ledger in the parent driver of the instance of the QldbSession. In any given QldbSession, only one transaction can
     be active at a time. This object can have only one underlying session to QLDB, and therefore the lifespan of a
     QldbSession is tied to the underlying session, which is not indefinite, and on expiry this QldbSession will become
     invalid, and a new QldbSession needs to be created from the parent driver in order to continue usage.
 
-    When a QldbSession is no longer needed, :py:meth:`pyqldb.session.qldb_session.QldbSession.close` should be invoked
-    in order to clean up any resources.
+    When a QldbSession is no longer needed, :py:meth:`pyqldb.session.qldb_session.QldbSession.end_session` should
+    be invoked in order to clean up any resources.
 
-    See :py:class:`pyqldb.driver.pooled_qldb_driver.PooledQldbDriver` for an example of session lifecycle management,
+    See :py:class:`pyqldb.driver.qldb_driver.QldbDriver` for an example of session lifecycle management,
     allowing the re-use of sessions when possible. There should only be one thread interacting with a session at any
     given time.
 
@@ -68,13 +66,29 @@ class QldbSession(BaseQldbSession):
 
     :type executor: :py:class:`concurrent.futures.thread.ThreadPoolExecutor`
     :param executor: The executor to be used by the retrieval thread.
+
+    :type return_session_to_pool: :function
+    :param return_session_to_pool: A callback that describes how the session will be returned to the pool.
     """
-    def __init__(self, session, read_ahead, retry_limit, executor):
+    def __init__(self, session, read_ahead, retry_limit, executor, return_session_to_pool):
         self._is_closed = False
         self._read_ahead = read_ahead
         self._retry_limit = retry_limit
-        self._session = session
         self._executor = executor
+        self._session = session
+        self._return_session_to_pool = return_session_to_pool
+
+    def __enter__(self):
+        """
+        Context Manager function to support the 'with' statement.
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Context Manager function to support the 'with' statement.
+        """
+        self._release()
 
     @property
     def ledger_name(self):
@@ -99,7 +113,13 @@ class QldbSession(BaseQldbSession):
 
     def close(self):
         """
-        Close this session. No-op if already closed.
+        Close this `QldbSession`.
+        """
+        self._is_closed = True
+
+    def end_session(self):
+        """
+        End this session. No-op if already closed.
         """
         if not self._is_closed:
             self._is_closed = True
@@ -186,6 +206,14 @@ class QldbSession(BaseQldbSession):
         except ClientError as e:
             raise StartTransactionError(e.response)
 
+    def _throw_if_closed(self):
+        """
+        Check and throw if this session is closed.
+        """
+        if self._is_closed:
+            logger.error(SessionClosedError())
+            raise SessionClosedError
+
     @staticmethod
     def _retry_sleep(attempt_number):
         """
@@ -206,3 +234,9 @@ class QldbSession(BaseQldbSession):
                 transaction.abort()
         except ClientError as ce:
             logger.warning('Ignored error aborting transaction during execution: {}'.format(ce))
+
+    def _release(self):
+        """
+        Return this `QldbSession` to the pool.
+        """
+        self._return_session_to_pool(self)

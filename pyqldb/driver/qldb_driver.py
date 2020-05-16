@@ -12,36 +12,30 @@ from queue import Queue, Empty
 from logging import getLogger
 from threading import BoundedSemaphore
 
+from boto3 import client
+from boto3.session import Session
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
+from .. import __version__
+from ..communication.session_client import SessionClient
+
 from ..errors import DriverClosedError, SessionPoolEmptyError, is_invalid_session_exception, StartTransactionError
-from ..session.pooled_qldb_session import PooledQldbSession
+from ..session.qldb_session import QldbSession
 from ..util.atomic_integer import AtomicInteger
-from .base_qldb_driver import BaseQldbDriver
 
-logger = getLogger(__name__)
+
 DEFAULT_TIMEOUT_SECONDS = 30
+logger = getLogger(__name__)
+SERVICE_DESCRIPTION = 'QLDB Driver for Python v{}'.format(__version__)
+SERVICE_NAME = 'qldb-session'
+SERVICE_RETRY = {'max_attempts': 0}
+DEFAULT_CONFIG = Config(user_agent_extra=SERVICE_DESCRIPTION, retries=SERVICE_RETRY)
 
-
-class PooledQldbDriver(BaseQldbDriver):
+class QldbDriver():
     """
-    Represents a factory for accessing pooled sessions to a specific ledger within QLDB. This class or
-    :py:class:`pyqldb.driver.qldb_driver.QldbDriver` should be the main entry points to any interaction with QLDB.
-    :py:meth:`pyqldb.driver.pooled_qldb_driver.PooledQldbDriver.get_session` will create a
-    :py:class:`pyqldb.session.pooled_qldb_session.PooledQldbSession` to the specified ledger within QLDB as a
-    communication channel. Any acquired sessions must be cleaned up with
-    :py:meth:`pyqldb.session.pooled_qldb_session.PooledQldbSession.close` when they are no longer needed in order to
-    return the session to the pool. If this is not done, this driver may become unusable if the pool limit is exceeded.
-
-    This factory pools sessions and attempts to return unused but available sessions when getting new sessions. The
-    advantage to using this over the non-pooling driver is that the underlying connection that sessions use to
-    communicate with QLDB can be recycled, minimizing resource usage by preventing unnecessary connections and reducing
-    latency by not making unnecessary requests to start new connections and end reusable, existing, ones.
-
-    The pool does not remove stale sessions until a new session is retrieved. The default pool size is the maximum
-    amount of connections the session client allows. :py:meth:`pyqldb.driver.pooled_qldb_driver.PooledQldbDriver.close`
-    should be called when this factory is no longer needed in order to clean up resources, ending all sessions in the
-    pool.
+    Creates a QldbDriver instance that can be used to execute transactions against Amazon QLDB. A single instance of
+    the QldbDriver is always attached to one ledger, as specified in the ledgerName parameter.
 
     :type ledger_name: str
     :param ledger_name: The QLDB ledger name.
@@ -104,8 +98,42 @@ class PooledQldbDriver(BaseQldbDriver):
     def __init__(self, ledger_name, retry_limit=4, read_ahead=0, executor=None, region_name=None, verify=None,
                  endpoint_url=None, aws_access_key_id=None, aws_secret_access_key=None, aws_session_token=None,
                  config=None, boto3_session=None, pool_limit=0, timeout=DEFAULT_TIMEOUT_SECONDS):
-        super().__init__(ledger_name, retry_limit, read_ahead, executor, region_name, verify, endpoint_url,
-                         aws_access_key_id, aws_secret_access_key, aws_session_token, config, boto3_session)
+
+        if retry_limit < 0:
+            raise ValueError('Value for retry_limit cannot be negative.')
+        if read_ahead < 2 and read_ahead != 0:
+            raise ValueError('Value for read_ahead must be 0 or 2 or greater.')
+
+        self._ledger_name = ledger_name
+        self._retry_limit = retry_limit
+        self._read_ahead = read_ahead
+        self._executor = executor
+        self._is_closed = False
+
+        if config is not None:
+            if not isinstance(config, Config):
+                raise TypeError('config must be of type botocore.config.Config. Found: {}'
+                                .format(type(config).__name__))
+            self._config = config.merge(DEFAULT_CONFIG)
+        else:
+            self._config = DEFAULT_CONFIG
+
+        if boto3_session is not None:
+            if not isinstance(boto3_session, Session):
+                raise TypeError('boto3_session must be of type boto3.session.Session. Found: {}'
+                                .format(type(boto3_session).__name__))
+
+            if region_name is not None or aws_access_key_id is not None or aws_secret_access_key is not None or \
+                    aws_session_token is not None:
+                logger.warning('Custom parameters were detected while using a specified Boto3 client and will be '
+                               'ignored. Please preconfigure the Boto3 client with those parameters instead.')
+
+            self._client = boto3_session.client(SERVICE_NAME, verify=verify, endpoint_url=endpoint_url,
+                                                config=self._config)
+        else:
+            self._client = client(SERVICE_NAME, region_name=region_name, verify=verify, endpoint_url=endpoint_url,
+                                  aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key,
+                                  aws_session_token=aws_session_token, config=self._config)
 
         if pool_limit < 0:
             raise ValueError('Value for pool_limit cannot be negative.')
@@ -127,14 +155,26 @@ class PooledQldbDriver(BaseQldbDriver):
         self._pool = Queue()
         self._timeout = timeout
 
+    def __enter__(self):
+        """
+        Context Manager function to support the 'with' statement.
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Context Manager function to support the 'with' statement.
+        """
+        self.close()
+
     def close(self):
         """
         Close the driver and any sessions in the pool.
         """
-        super().close()
+        self._is_closed = True
         while not self._pool.empty():
             cur_session = self._pool.get_nowait()
-            cur_session.close()
+            cur_session.end_session()
 
     def list_tables(self):
         """
@@ -154,6 +194,7 @@ class PooledQldbDriver(BaseQldbDriver):
     def execute_lambda(self, query_lambda, retry_indicator=lambda execution_attempt: None):
         """
         Execute the lambda function against QLDB within a transaction and retrieve the result.
+        This is the primary method to execute a transaction against Amazon QLDB ledger.
 
         :type query_lambda: function
         :param query_lambda: The lambda function to execute. A lambda function cannot have any side effects as
@@ -189,14 +230,52 @@ class PooledQldbDriver(BaseQldbDriver):
                 else:
                     raise ce
 
+    @property
+    def read_ahead(self):
+        """
+        The number of read-ahead buffers to be made available per `StreamCursor` instantiated by this driver.
+        Determines the maximum number of result pages that can be buffered in memory.
+
+        .. seealso:: :py:class:`pyqldb.cursor.stream_cursor.StreamCursor`
+        """
+        return self._read_ahead
+
+    @property
+    def retry_limit(self):
+        """
+        The number of automatic retries for statement executions using convenience methods on sessions when
+        an OCC conflict or retriable exception occurs.
+        """
+        return self._retry_limit
+
+    def _create_new_session(self):
+        """
+        Create a new QldbSession object.
+        """
+        session_client = SessionClient.start_session(self._ledger_name, self._client)
+        return QldbSession(session_client, self._read_ahead, self._retry_limit, self._executor,
+                           self._release_session)
+
+    def _release_session(self, session):
+        """
+        Release a session back into the pool.
+        """
+
+        if not session._is_closed:
+            self._pool.put(session)
+
+        self._pool_permits.release()
+        self._pool_permits_counter.increment()
+        logger.debug('Number of sessions in pool : {}'.format(self._pool.qsize()))
+
     def _get_session(self):
         """
         This method will attempt to retrieve an active, existing session, or it will start a new session with QLDB if
         none are available and the session pool limit has not been reached. If the pool limit has been reached, it will
         attempt to retrieve a session from the pool until the timeout is reached.
 
-        :rtype: :py:class:`pyqldb.session.pooled_qldb_session.PooledQldbSession`
-        :return: A PooledQldbSession object.
+        :rtype: :py:class:`pyqldb.session.qldb_session.QldbSession`
+        :return: A QldbSession object.
 
         :raises SessionPoolEmptyError: If the timeout is reached while attempting to retrieve a session.
 
@@ -213,12 +292,12 @@ class PooledQldbDriver(BaseQldbDriver):
                 try:
                     cur_session = self._pool.get_nowait()
                     logger.debug('Reusing session from pool. Session ID: {}.'.format(cur_session.session_id))
-                    return PooledQldbSession(cur_session, self._release_session)
+                    return cur_session
                 except Empty:
                     pass
 
-                logger.debug('Creating new pooled session.')
-                return PooledQldbSession(self._create_new_session(), self._release_session)
+                logger.debug('Creating new session.')
+                return self._create_new_session()
             except Exception as e:
                 # If they don't get a session they don't use a permit!
                 self._pool_permits.release()
@@ -226,15 +305,3 @@ class PooledQldbDriver(BaseQldbDriver):
                 raise e
         else:
             raise SessionPoolEmptyError(self._timeout)
-
-    def _release_session(self, session):
-        """
-        Release a session back into the pool.
-        """
-
-        if not session._is_closed:
-            self._pool.put(session)
-
-        self._pool_permits.release()
-        self._pool_permits_counter.increment()
-        logger.debug('Number of sessions in pool : {}'.format(self._pool.qsize()))

@@ -14,7 +14,7 @@ from time import sleep
 
 import boto3
 from botocore.exceptions import ClientError
-from pyqldb.driver.pooled_qldb_driver import DEFAULT_TIMEOUT_SECONDS, PooledQldbDriver
+from pyqldb.driver.qldb_driver import DEFAULT_TIMEOUT_SECONDS, QldbDriver
 
 logger = getLogger(__name__)
 basicConfig(level=INFO)
@@ -68,14 +68,14 @@ class IntegrationTestBase:
                 logger.info('The ledger is deleted')
                 return
 
-    def pooled_qldb_driver(self, ledger_name=None, pool_limit=0, time_out=DEFAULT_TIMEOUT_SECONDS, retry_limit=4):
+    def qldb_driver(self, ledger_name=None, pool_limit=0, time_out=DEFAULT_TIMEOUT_SECONDS, retry_limit=4):
         if ledger_name is not None:
             ledger_name = ledger_name
         else:
             ledger_name = self.ledger_name
 
-        return PooledQldbDriver(ledger_name=ledger_name, region_name=self.region, pool_limit=pool_limit,
-                                timeout=time_out, retry_limit=retry_limit)
+        return QldbDriver(ledger_name=ledger_name, region_name=self.region, pool_limit=pool_limit,
+                          timeout=time_out, retry_limit=retry_limit)
 
 
 class ThreadThatSavesException(Thread):

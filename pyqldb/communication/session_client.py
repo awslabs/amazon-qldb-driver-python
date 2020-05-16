@@ -22,7 +22,7 @@ logger = getLogger(__name__)
 class SessionClient:
     """
     A class representing an independent session to a QLDB ledger that handles endpoint requests. This class is used in
-    :py:class:`pyqldb.driver.base_qldb_driver.BaseQldbDriver` and :py:class:`pyqldb.session.qldb_session.QldbSession`.
+    :py:class:`pyqldb.driver.qldb_driver.QldbDriver` and :py:class:`pyqldb.session.qldb_session.QldbSession`.
     This class is not meant to be used directly by developers.
 
     :type ledger_name: str

@@ -1,9 +1,9 @@
 ==========================
-PooledQldbDriver Reference
+QldbDriver Reference
 ==========================
 
 
-.. automodule:: pyqldb.driver.pooled_qldb_driver
+.. automodule:: pyqldb.driver.qldb_driver
    :members:
    :undoc-members:
 

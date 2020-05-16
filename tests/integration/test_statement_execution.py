@@ -30,21 +30,21 @@ class TestStatementExecution(TestCase):
         cls.integration_test_base.force_delete_ledger()
         cls.integration_test_base.create_ledger()
 
-        cls.pooled_qldb_driver = cls.integration_test_base.pooled_qldb_driver()
+        cls.qldb_driver = cls.integration_test_base.qldb_driver()
 
         # Create table.
-        cls.pooled_qldb_driver.execute_lambda(lambda txn:
+        cls.qldb_driver.execute_lambda(lambda txn:
                                               txn.execute_statement("CREATE TABLE {}".format(TABLE_NAME)))
-        cls.pooled_qldb_driver.list_tables()
+        cls.qldb_driver.list_tables()
 
     @classmethod
     def tearDownClass(cls):
-        cls.pooled_qldb_driver.close()
+        cls.qldb_driver.close()
         cls.integration_test_base.delete_ledger()
 
     def tearDown(self):
         # Delete all documents in table.
-        self.pooled_qldb_driver.execute_lambda(lambda txn: txn.execute_statement("DELETE FROM {}".format(TABLE_NAME)))
+        self.qldb_driver.execute_lambda(lambda txn: txn.execute_statement("DELETE FROM {}".format(TABLE_NAME)))
 
     def test_drop_an_existing_table(self):
         # Given.
@@ -57,11 +57,11 @@ class TestStatementExecution(TestCase):
                 count += 1
             return count
 
-        create_table_count = self.pooled_qldb_driver.execute_lambda(lambda txn:
+        create_table_count = self.qldb_driver.execute_lambda(lambda txn:
                                                                     execute_statement_and_return_count(txn, query))
         self.assertEqual(1, create_table_count)
 
-        table_cursor = self.pooled_qldb_driver.list_tables()
+        table_cursor = self.qldb_driver.list_tables()
         tables = list()
         for row in table_cursor:
             tables.append(row)
@@ -78,14 +78,14 @@ class TestStatementExecution(TestCase):
             return count
 
         # When.
-        drop_table_count = self.pooled_qldb_driver.execute_lambda(lambda txn:
+        drop_table_count = self.qldb_driver.execute_lambda(lambda txn:
                                                                   execute_statement_and_return_count(txn, query))
         # Then.
         self.assertEqual(1, drop_table_count)
 
     def test_list_tables(self):
         # When.
-        cursor = self.pooled_qldb_driver.list_tables()
+        cursor = self.qldb_driver.list_tables()
 
         # Then.
         tables = list()
@@ -100,7 +100,7 @@ class TestStatementExecution(TestCase):
         query = "CREATE TABLE {}".format(TABLE_NAME)
 
         # Then.
-        self.assertRaises(ClientError, self.pooled_qldb_driver.execute_lambda, lambda txn: txn.execute_statement(query))
+        self.assertRaises(ClientError, self.qldb_driver.execute_lambda, lambda txn: txn.execute_statement(query))
 
     def test_create_index(self):
         # Given.
@@ -114,7 +114,7 @@ class TestStatementExecution(TestCase):
             return count
 
         # When.
-        count = self.pooled_qldb_driver.execute_lambda(lambda txn: execute_statement_and_return_count(txn, query))
+        count = self.qldb_driver.execute_lambda(lambda txn: execute_statement_and_return_count(txn, query))
         self.assertEqual(1, count)
 
         # Then.
@@ -130,7 +130,7 @@ class TestStatementExecution(TestCase):
             # }
             return next(cursor)['expr']
 
-        value = self.pooled_qldb_driver.execute_lambda(lambda txn:
+        value = self.qldb_driver.execute_lambda(lambda txn:
                                                        execute_statement_and_return_index_value(txn, search_query))
         self.assertEqual("[" + INDEX_ATTRIBUTE + "]", value)
 
@@ -146,7 +146,7 @@ class TestStatementExecution(TestCase):
             return count
 
         # When.
-        count = self.pooled_qldb_driver.execute_lambda(lambda txn: execute_statement_and_return_count(txn, query))
+        count = self.qldb_driver.execute_lambda(lambda txn: execute_statement_and_return_count(txn, query))
 
         # Then.
         self.assertEqual(0, count)
@@ -166,7 +166,7 @@ class TestStatementExecution(TestCase):
             return count
 
         # When.
-        count = self.pooled_qldb_driver.execute_lambda(lambda txn:
+        count = self.qldb_driver.execute_lambda(lambda txn:
                                                        execute_statement_with_parameter_and_return_count(txn, query,
                                                                                                          ion_value))
         self.assertEqual(1, count)
@@ -179,7 +179,7 @@ class TestStatementExecution(TestCase):
             cursor = txn.execute_statement(query, *parameters)
             return next(cursor)
 
-        value = self.pooled_qldb_driver.execute_lambda(
+        value = self.qldb_driver.execute_lambda(
             lambda txn: execute_statement_and_return_value(txn, search_query, ion_string))
         self.assertEqual(SINGLE_DOCUMENT_VALUE, value)
 
@@ -197,7 +197,7 @@ class TestStatementExecution(TestCase):
                 count += 1
             return count
 
-        count = self.pooled_qldb_driver.execute_lambda(
+        count = self.qldb_driver.execute_lambda(
             lambda txn: execute_statement_with_parameter_and_return_count(txn, query, ion_value))
         self.assertEqual(1, count)
 
@@ -209,7 +209,7 @@ class TestStatementExecution(TestCase):
             return next(cursor)
 
         # When.
-        value = self.pooled_qldb_driver.execute_lambda(
+        value = self.qldb_driver.execute_lambda(
             lambda txn: execute_statement_and_return_value(txn, search_query, ion_string))
 
         # Then.
@@ -229,7 +229,7 @@ class TestStatementExecution(TestCase):
                 count += 1
             return count
 
-        count = self.pooled_qldb_driver.execute_lambda(
+        count = self.qldb_driver.execute_lambda(
             lambda txn: execute_statement_with_parameter_and_return_count(txn, query, ion_value))
         self.assertEqual(1, count)
 
@@ -241,7 +241,7 @@ class TestStatementExecution(TestCase):
             return next(cursor)
 
         # When.
-        value = self.pooled_qldb_driver.execute_lambda(
+        value = self.qldb_driver.execute_lambda(
             lambda txn: execute_statement_and_return_value(txn, search_query, ion_string))
 
         # Then.
@@ -263,7 +263,7 @@ class TestStatementExecution(TestCase):
             return count
 
         # When.
-        count = self.pooled_qldb_driver.execute_lambda(
+        count = self.qldb_driver.execute_lambda(
             lambda txn: execute_statement_with_parameters_and_return_count(txn, query, parameter_1, parameter_2))
         self.assertEqual(2, count)
 
@@ -280,7 +280,7 @@ class TestStatementExecution(TestCase):
                 values.append(row)
             return values
 
-        values = self.pooled_qldb_driver.execute_lambda(
+        values = self.qldb_driver.execute_lambda(
             lambda txn: execute_statement_with_parameters_and_return_list_of_values(txn, search_query, ion_string_1,
                                                                                     ion_string_2))
         self.assertTrue(MULTIPLE_DOCUMENT_VALUE_1 in values)
@@ -300,7 +300,7 @@ class TestStatementExecution(TestCase):
                 count += 1
             return count
 
-        count = self.pooled_qldb_driver.execute_lambda(
+        count = self.qldb_driver.execute_lambda(
             lambda txn: execute_statement_with_parameter_and_return_count(txn, query, ion_value))
         self.assertEqual(1, count)
 
@@ -315,7 +315,7 @@ class TestStatementExecution(TestCase):
                 count += 1
             return count
 
-        count = self.pooled_qldb_driver.execute_lambda(
+        count = self.qldb_driver.execute_lambda(
             lambda txn: execute_statement_and_return_count(txn, delete_query, ion_string))
         self.assertEqual(1, count)
 
@@ -329,7 +329,7 @@ class TestStatementExecution(TestCase):
             cursor = txn.execute_statement(search_query)
             return next(cursor)['_1']
 
-        count = self.pooled_qldb_driver.execute_lambda(lambda txn: execute_count_statement_and_return_count(txn))
+        count = self.qldb_driver.execute_lambda(lambda txn: execute_count_statement_and_return_count(txn))
         self.assertEqual(0, count)
 
     def test_delete_all_documents(self):
@@ -347,7 +347,7 @@ class TestStatementExecution(TestCase):
                 count += 1
             return count
 
-        count = self.pooled_qldb_driver.execute_lambda(
+        count = self.qldb_driver.execute_lambda(
             lambda txn: execute_statement_with_parameters_and_return_count(txn, query, parameter_1, parameter_2))
         self.assertEqual(2, count)
 
@@ -361,7 +361,7 @@ class TestStatementExecution(TestCase):
                 count += 1
             return count
 
-        count = self.pooled_qldb_driver.execute_lambda(
+        count = self.qldb_driver.execute_lambda(
             lambda txn: execute_statement_and_return_count(txn, delete_query))
         self.assertEqual(2, count)
 
@@ -375,12 +375,12 @@ class TestStatementExecution(TestCase):
             cursor = txn.execute_statement(search_query)
             return next(cursor)['_1']
 
-        count = self.pooled_qldb_driver.execute_lambda(lambda txn: execute_count_statement_and_return_count(txn))
+        count = self.qldb_driver.execute_lambda(lambda txn: execute_count_statement_and_return_count(txn))
         self.assertEqual(0, count)
 
     def test_occ_exception_is_thrown(self):
         # Create driver with zero retry limit to trigger OCC exception.
-        driver = self.integration_test_base.pooled_qldb_driver(retry_limit=0)
+        driver = self.integration_test_base.qldb_driver(retry_limit=0)
 
         # Insert document.
         ion_value = loads(dumps({COLUMN_NAME: 0}))
@@ -430,7 +430,7 @@ class TestStatementExecution(TestCase):
                     return count
 
                 # When.
-                count = self.pooled_qldb_driver.execute_lambda(
+                count = self.qldb_driver.execute_lambda(
                     lambda txn: execute_statement_and_return_count(txn, query, ion_struct))
                 self.assertEqual(1, count)
 
@@ -442,13 +442,13 @@ class TestStatementExecution(TestCase):
                 if isinstance(ion_value, IonPyNull):
                     search_query = "SELECT VALUE {} FROM {} WHERE {} IS NULL".format(COLUMN_NAME, TABLE_NAME,
                                                                                      COLUMN_NAME)
-                    value = self.pooled_qldb_driver.execute_lambda(lambda txn:
+                    value = self.qldb_driver.execute_lambda(lambda txn:
                                                                    execute_statement_and_return_value(txn,
                                                                                                       search_query))
 
                 else:
                     search_query = "SELECT VALUE {} FROM {} WHERE {} = ?".format(COLUMN_NAME, TABLE_NAME, COLUMN_NAME)
-                    value = self.pooled_qldb_driver.execute_lambda(lambda txn:
+                    value = self.qldb_driver.execute_lambda(lambda txn:
                                                                    execute_statement_and_return_value(txn,
                                                                                                       search_query,
                                                                                                       ion_value))
@@ -456,7 +456,7 @@ class TestStatementExecution(TestCase):
                 self.assertEqual(ion_value.ion_type, value.ion_type)
 
                 # Delete documents in table for testing next Ion value.
-                self.pooled_qldb_driver.execute_lambda(lambda txn:
+                self.qldb_driver.execute_lambda(lambda txn:
                                                        txn.execute_statement("DELETE FROM {}".format(TABLE_NAME,
                                                                                                      COLUMN_NAME)))
 
@@ -474,7 +474,7 @@ class TestStatementExecution(TestCase):
 
         # Insert first record that will be subsequently updated.
         query = "INSERT INTO {} ?".format(TABLE_NAME)
-        count = self.pooled_qldb_driver.execute_lambda(lambda txn:
+        count = self.qldb_driver.execute_lambda(lambda txn:
                                                        execute_statement_and_return_count(txn, query, ion_value))
         self.assertEqual(1, count)
 
@@ -483,7 +483,7 @@ class TestStatementExecution(TestCase):
             with self.subTest(ion_value=ion_value):
                 # When.
                 query = "UPDATE {} SET {} = ?".format(TABLE_NAME, COLUMN_NAME)
-                count = self.pooled_qldb_driver.execute_lambda(lambda txn:
+                count = self.qldb_driver.execute_lambda(lambda txn:
                                                                execute_statement_and_return_count(txn, query,
                                                                                                   ion_value))
                 self.assertEqual(1, count)
@@ -496,13 +496,13 @@ class TestStatementExecution(TestCase):
                 if isinstance(ion_value, IonPyNull):
                     search_query = "SELECT VALUE {} FROM {} WHERE {} IS NULL".format(COLUMN_NAME, TABLE_NAME,
                                                                                      COLUMN_NAME)
-                    value = self.pooled_qldb_driver.execute_lambda(lambda txn:
+                    value = self.qldb_driver.execute_lambda(lambda txn:
                                                                    execute_statement_and_return_value(txn,
                                                                                                       search_query))
 
                 else:
                     search_query = "SELECT VALUE {} FROM {} WHERE {} = ?".format(COLUMN_NAME, TABLE_NAME, COLUMN_NAME)
-                    value = self.pooled_qldb_driver.execute_lambda(lambda txn:
+                    value = self.qldb_driver.execute_lambda(lambda txn:
                                                                    execute_statement_and_return_value(txn,
                                                                                                       search_query,
                                                                                                       ion_value))
@@ -516,7 +516,7 @@ class TestStatementExecution(TestCase):
 
         # When.
         query = "INSERT INTO {} ?".format(TABLE_NAME)
-        self.pooled_qldb_driver.execute_lambda(lambda txn: txn.execute_statement(query, ion_struct))
+        self.qldb_driver.execute_lambda(lambda txn: txn.execute_statement(query, ion_struct))
 
         # Then.
         search_query = "SELECT VALUE {} FROM {} WHERE {} = ?".format(COLUMN_NAME, TABLE_NAME, COLUMN_NAME)
@@ -526,7 +526,7 @@ class TestStatementExecution(TestCase):
             cursor = txn.execute_statement(query, *parameters)
             return next(cursor)
 
-        value = self.pooled_qldb_driver.execute_lambda(
+        value = self.qldb_driver.execute_lambda(
             lambda txn: execute_statement_and_return_value(txn, search_query, ion_string))
         self.assertEqual(SINGLE_DOCUMENT_VALUE, value)
 
@@ -535,7 +535,7 @@ class TestStatementExecution(TestCase):
         query = "DELETE FROM NonExistentTable"
 
         # When.
-        self.assertRaises(ClientError, self.pooled_qldb_driver.execute_lambda, lambda txn: txn.execute_statement(query))
+        self.assertRaises(ClientError, self.qldb_driver.execute_lambda, lambda txn: txn.execute_statement(query))
 
 
 def create_ion_values():
