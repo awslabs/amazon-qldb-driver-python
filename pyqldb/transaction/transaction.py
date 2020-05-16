@@ -26,7 +26,7 @@ class Transaction:
     """
     A class representing a QLDB transaction.
 
-    Every transaction is tied to a parent (Pooled)QldbSession, meaning that if the parent session is closed or
+    Every transaction is tied to a parent QldbSession, meaning that if the parent session is closed or
     invalidated, the child transaction is automatically closed and cannot be used. Only one transaction can be active at
     any given time per parent session, and thus every transaction should call
     :py:meth:`pyqldb.transaction.transaction.Transaction.abort` or
@@ -34,7 +34,7 @@ class Transaction:
     is desired from the parent session.
 
     An InvalidSessionException indicates that the parent session is dead, and a new transaction cannot be created
-    without a new (Pooled)QldbSession being created from the parent driver.
+    without a new QldbSession being created from the parent driver.
 
     Any unexpected errors that occur within a transaction should not be retried using the same transaction, as the state
     of the transaction is now ambiguous.

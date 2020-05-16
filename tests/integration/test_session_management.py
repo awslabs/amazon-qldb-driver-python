@@ -33,15 +33,15 @@ class TestSessionManagement(TestCase):
         cls.integration_test_base.delete_ledger()
 
     def test_connect_to_non_existent_ledger(self):
-        with self.integration_test_base.pooled_qldb_driver("nonExistentLedger") as pooled_qldb_driver:
-            self.assertRaises(ClientError, pooled_qldb_driver.list_tables)
+        with self.integration_test_base.qldb_driver("nonExistentLedger") as qldb_driver:
+            self.assertRaises(ClientError, qldb_driver.list_tables)
 
     def test_get_session_when_pool_does_not_have_session_and_has_not_hit_limit(self):
         # Start a pooled driver with default pool limit so it doesn't have sessions in the pool
         # and has not hit the limit.
-        with self.integration_test_base.pooled_qldb_driver() as pooled_qldb_driver:
+        with self.integration_test_base.qldb_driver() as qldb_driver:
             try:
-                pooled_qldb_driver.list_tables()
+                qldb_driver.list_tables()
             except ClientError as e:
                 self.fail(repr(e))
 
@@ -49,11 +49,11 @@ class TestSessionManagement(TestCase):
         try:
             # Start a pooled driver with default pool limit so it doesn't have sessions in the pool
             # and has not hit the limit.
-            with self.integration_test_base.pooled_qldb_driver() as pooled_qldb_driver:
+            with self.integration_test_base.qldb_driver() as qldb_driver:
                 # Call the first list_tables() to start session and put into pool.
-                pooled_qldb_driver.list_tables()
+                qldb_driver.list_tables()
                 # Call the second list_tables() to use session from pool and is expected to execute successfully.
-                pooled_qldb_driver.list_tables()
+                qldb_driver.list_tables()
         except ClientError as e:
             self.fail(repr(e))
 
@@ -63,9 +63,9 @@ class TestSessionManagement(TestCase):
 
         # With the time out set to 1 ms, only one thread should go through.
         # The other thread will try to acquire the session, but because it can wait for only 1ms, it will error out.
-        with self.integration_test_base.pooled_qldb_driver(pool_limit=1, time_out=0.001) as pooled_qldb_driver:
-            thread_1 = ThreadThatSavesException(target=pooled_qldb_driver.list_tables, bucket=bucket)
-            thread_2 = ThreadThatSavesException(target=pooled_qldb_driver.list_tables, bucket=bucket)
+        with self.integration_test_base.qldb_driver(pool_limit=1, time_out=0.001) as qldb_driver:
+            thread_1 = ThreadThatSavesException(target=qldb_driver.list_tables, bucket=bucket)
+            thread_2 = ThreadThatSavesException(target=qldb_driver.list_tables, bucket=bucket)
 
             thread_1.start()
             thread_2.start()
@@ -81,11 +81,11 @@ class TestSessionManagement(TestCase):
         bucket = Queue()
 
         # Start a pooled driver with pool limit of 1 and default timeout of 30 seconds.
-        with self.integration_test_base.pooled_qldb_driver(pool_limit=1, time_out=30) as pooled_qldb_driver:
+        with self.integration_test_base.qldb_driver(pool_limit=1, time_out=30) as qldb_driver:
             # Start two threads to execute list_tables() concurrently which will hit the session pool limit but
             # will succeed because session is returned to pool before timing out.
-            thread_1 = ThreadThatSavesException(target=pooled_qldb_driver.list_tables, bucket=bucket)
-            thread_2 = ThreadThatSavesException(target=pooled_qldb_driver.list_tables, bucket=bucket)
+            thread_1 = ThreadThatSavesException(target=qldb_driver.list_tables, bucket=bucket)
+            thread_2 = ThreadThatSavesException(target=qldb_driver.list_tables, bucket=bucket)
 
             thread_1.start()
             thread_2.start()
@@ -96,7 +96,7 @@ class TestSessionManagement(TestCase):
         self.assertEqual(0, bucket.qsize())
 
     def test_get_session_when_driver_is_closed(self):
-        pooled_qldb_driver = self.integration_test_base.pooled_qldb_driver()
+        qldb_driver = self.integration_test_base.qldb_driver()
 
-        pooled_qldb_driver.close()
-        self.assertRaises(DriverClosedError, pooled_qldb_driver.list_tables)
+        qldb_driver.close()
+        self.assertRaises(DriverClosedError, qldb_driver.list_tables)

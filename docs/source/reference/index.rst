@@ -4,17 +4,7 @@ API References
 .. toctree::
    :maxdepth: 3
 
-   driver/pooled_qldb_driver
-
-.. toctree::
-   :maxdepth: 3
-
-   session/pooled_qldb_session
-
-.. toctree::
-   :maxdepth: 3
-
-   transaction/transaction
+   driver/qldb_driver
 
 .. toctree::
    :maxdepth: 3

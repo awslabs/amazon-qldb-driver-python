@@ -11,7 +11,6 @@
 from unittest import TestCase
 from unittest.mock import call, Mock, patch, PropertyMock
 
-from amazon.ion.simpleion import loads
 from botocore.exceptions import ClientError
 
 from pyqldb.errors import SessionClosedError, LambdaAbortedError, StartTransactionError
@@ -29,33 +28,37 @@ MOCK_SLEEP_BASE_MS = 10
 MOCK_TRANSACTION_ID = 'transaction_id'
 MOCK_TRANSACTION_RESULT = {'TransactionId': MOCK_TRANSACTION_ID}
 MOCK_CLIENT_ERROR_MESSAGE = {'Error': {'Code': MOCK_ERROR_CODE, 'Message': MOCK_MESSAGE}}
+MOCK_DRIVER_RELEASE = Mock()
 
 
 class TestQldbSession(TestCase):
+    @patch('pyqldb.driver.qldb_driver.QldbDriver._release_session')
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
     @patch('pyqldb.communication.session_client.SessionClient')
-    def test_constructor(self, mock_session, mock_executor):
-        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor)
+    def test_constructor(self, mock_session, mock_executor, mock_release_session):
+        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT,
+                                   mock_executor, mock_release_session)
 
         self.assertEqual(qldb_session._is_closed, False)
         self.assertEqual(qldb_session._read_ahead, MOCK_READ_AHEAD)
         self.assertEqual(qldb_session._retry_limit, MOCK_RETRY_LIMIT)
         self.assertEqual(qldb_session._session, mock_session)
         self.assertEqual(qldb_session._executor, mock_executor)
+        self.assertEqual(qldb_session._return_session_to_pool, mock_release_session)
 
-    @patch('pyqldb.session.qldb_session.QldbSession.close')
-    @patch('concurrent.futures.thread.ThreadPoolExecutor')
+    @patch('pyqldb.driver.qldb_driver.QldbDriver._release_session')
     @patch('pyqldb.communication.session_client.SessionClient')
-    def test_context_manager(self, mock_session, mock_executor, mock_close):
-        mock_session.ledger_name = MOCK_LEDGER_NAME
-        with QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor):
+    @patch('concurrent.futures.thread.ThreadPoolExecutor')
+    def test_context_manager(self, mock_executor, mock_session, mock_release_session):
+        with QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT,
+                         mock_executor, mock_release_session) as session:
             pass
-        mock_close.assert_called_once_with()
+        mock_release_session.assert_called_once_with(session)
 
-    @patch('pyqldb.session.qldb_session.QldbSession.close')
+    @patch('pyqldb.session.qldb_session.QldbSession._release')
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
     @patch('pyqldb.communication.session_client.SessionClient')
-    def test_context_manager_with_start_transaction_error(self, mock_session, mock_executor, mock_close):
+    def test_context_manager_with_start_transaction_error(self, mock_session, mock_executor, mock_release):
         mock_invalid_session_error_message = {'Error': {'Code': 'InvalidSessionException',
                                                         'Message': MOCK_MESSAGE}}
         mock_invalid_session_error = ClientError(mock_invalid_session_error_message, MOCK_MESSAGE)
@@ -64,23 +67,51 @@ class TestQldbSession(TestCase):
         mock_session.start_transaction.side_effect = mock_invalid_session_error
 
         with self.assertRaises(StartTransactionError):
-            with QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor) as qldb_session:
+            with QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor,
+                             MOCK_DRIVER_RELEASE) as qldb_session:
                 qldb_session.start_transaction()
-        mock_close.assert_called_once_with()
+        mock_release.assert_called_once_with()
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
     @patch('pyqldb.communication.session_client.SessionClient')
     def test_get_ledger_name(self, mock_session, mock_executor):
         mock_session.ledger_name = MOCK_LEDGER_NAME
-        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor)
+        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT,
+                                   mock_executor, MOCK_DRIVER_RELEASE)
 
         self.assertEqual(qldb_session.ledger_name, MOCK_LEDGER_NAME)
+
+    @patch('pyqldb.session.qldb_session.logger.error')
+    @patch('pyqldb.driver.qldb_driver.QldbDriver._release_session')
+    @patch('pyqldb.communication.session_client.SessionClient')
+    @patch('concurrent.futures.thread.ThreadPoolExecutor')
+    def test_throw_if_closed_when_closed(self, mock_executor, mock_session, mock_release_session, mock_logger_error):
+        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT,
+                                          mock_executor, mock_release_session)
+        qldb_session._is_closed = True
+
+        self.assertRaises(SessionClosedError, qldb_session._throw_if_closed)
+        mock_logger_error.assert_called_once()
+
+    @patch('pyqldb.session.qldb_session.logger.error')
+    @patch('pyqldb.driver.qldb_driver.QldbDriver._release_session')
+    @patch('pyqldb.communication.session_client.SessionClient')
+    @patch('concurrent.futures.thread.ThreadPoolExecutor')
+    def test_throw_if_closed_not_closed(self, mock_executor, mock_session, mock_release_session, mock_logger_error):
+        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT,
+                                          mock_executor, mock_release_session)
+        qldb_session._is_closed = False
+
+        result = qldb_session._throw_if_closed()
+        self.assertEqual(result, None)
+        mock_logger_error.assert_not_called()
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
     @patch('pyqldb.communication.session_client.SessionClient')
     def test_get_session_id(self, mock_session, mock_executor):
         mock_session.id = MOCK_ID
-        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor)
+        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT,
+                                   mock_executor, MOCK_DRIVER_RELEASE)
 
         self.assertEqual(qldb_session.session_id, MOCK_ID)
 
@@ -88,29 +119,30 @@ class TestQldbSession(TestCase):
     @patch('pyqldb.communication.session_client.SessionClient')
     def test_get_session_token(self, mock_session, mock_executor):
         mock_session.token = mock_session
-        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor)
+        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT,
+                                   mock_executor, MOCK_DRIVER_RELEASE)
 
         self.assertEqual(qldb_session.session_token, mock_session)
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
     @patch('pyqldb.communication.session_client.SessionClient')
     def test_close(self, mock_session, mock_executor):
-        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor)
+        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT,
+                                   mock_executor, MOCK_DRIVER_RELEASE)
         qldb_session._is_closed = False
         qldb_session.close()
         self.assertTrue(qldb_session._is_closed)
-        mock_session.close.assert_called_once_with()
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
     @patch('pyqldb.communication.session_client.SessionClient')
     def test_close_twice(self, mock_session, mock_executor):
-        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor)
+        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT,
+                                   mock_executor, MOCK_DRIVER_RELEASE)
         qldb_session._is_closed = False
         qldb_session.close()
         qldb_session.close()
 
         self.assertTrue(qldb_session._is_closed)
-        mock_session.close.assert_called_once_with()
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
     @patch('pyqldb.session.qldb_session.isinstance')
@@ -131,7 +163,8 @@ class TestQldbSession(TestCase):
         mock_lambda = Mock()
         mock_lambda.return_value = MOCK_RESULT
 
-        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor)
+        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT,
+                                   mock_executor, MOCK_DRIVER_RELEASE)
         result = qldb_session.execute_lambda(mock_lambda, None)
 
         mock_start_transaction.assert_called_once_with()
@@ -157,7 +190,8 @@ class TestQldbSession(TestCase):
 
         mock_lambda = Mock()
 
-        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor)
+        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT,
+                                   mock_executor, MOCK_DRIVER_RELEASE)
         self.assertRaises(ClientError, qldb_session.execute_lambda, mock_lambda)
         mock_no_throw_abort.assert_called_once_with(None)
 
@@ -176,7 +210,8 @@ class TestQldbSession(TestCase):
         mock_start_transaction.return_value = mock_transaction
         mock_is_occ_conflict_exception.return_value = True
         mock_is_retriable_exception.return_value = False
-        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor)
+        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT,
+                                   mock_executor, MOCK_DRIVER_RELEASE)
 
         mock_lambda = Mock()
         mock_lambda.side_effect = ce
@@ -206,7 +241,8 @@ class TestQldbSession(TestCase):
         mock_start_transaction.return_value = mock_transaction
         mock_is_retriable_exception.return_value = True
         mock_is_occ_conflict_exception.return_value = False
-        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor)
+        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT,
+                                   mock_executor, MOCK_DRIVER_RELEASE)
 
         mock_lambda = Mock()
         mock_lambda.side_effect = ce
@@ -226,7 +262,7 @@ class TestQldbSession(TestCase):
     @patch('pyqldb.session.qldb_session.logger')
     @patch('pyqldb.session.qldb_session.is_invalid_session_exception')
     @patch('pyqldb.session.qldb_session.Transaction')
-    @patch('pyqldb.session.qldb_session.SessionClient')
+    @patch('pyqldb.communication.session_client.SessionClient')
     @patch('pyqldb.session.qldb_session.QldbSession.start_transaction')
     def test_execute_lambda_invalid_session_exception(self, mock_start_transaction, mock_session, mock_transaction,
                                                       mock_is_invalid_session, mock_logger, mock_executor,
@@ -238,7 +274,7 @@ class TestQldbSession(TestCase):
         type(mock_session).ledger_name = PropertyMock(return_value=MOCK_LEDGER_NAME)
         mock_session.start_session = mock_session
         mock_is_invalid_session.return_value = True
-        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, 1, mock_executor)
+        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, 1, mock_executor, MOCK_DRIVER_RELEASE)
 
         mock_lambda = Mock()
         mock_lambda.side_effect = ce
@@ -268,7 +304,8 @@ class TestQldbSession(TestCase):
         mock_is_occ_conflict.return_value = True
         mock_is_retriable_exception.return_value = False
         retry_indicator = Mock()
-        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor)
+        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT,
+                                   mock_executor, MOCK_DRIVER_RELEASE)
 
         mock_lambda = Mock()
         mock_lambda.side_effect = ce
@@ -300,7 +337,8 @@ class TestQldbSession(TestCase):
         mock_is_occ_conflict.return_value = True
         mock_is_retriable_exception.return_value = False
         retry_indicator = Mock()
-        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor)
+        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT,
+                                   mock_executor, MOCK_DRIVER_RELEASE)
 
         mock_lambda = Mock()
         mock_lambda.side_effect = LambdaAbortedError
@@ -312,7 +350,8 @@ class TestQldbSession(TestCase):
     @patch('pyqldb.session.qldb_session.Transaction')
     @patch('pyqldb.communication.session_client.SessionClient')
     def test_start_transaction(self, mock_session, mock_transaction, mock_executor):
-        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor)
+        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT,
+                                   mock_executor, MOCK_DRIVER_RELEASE)
         mock_transaction.return_value = mock_transaction
         mock_session.start_transaction.return_value = MOCK_TRANSACTION_RESULT
         transaction = qldb_session.start_transaction()
