@@ -18,7 +18,7 @@ from botocore.config import Config
 from boto3.session import Session
 
 from pyqldb.driver.pooled_qldb_driver import PooledQldbDriver
-from pyqldb.errors import DriverClosedError
+from pyqldb.errors import DriverClosedError, StartTransactionError
 
 DEFAULT_SESSION_NAME = 'qldb-session'
 DEFAULT_POOL_LIMIT = 10
@@ -301,7 +301,7 @@ class TestPooledQldbDriver(TestCase):
         mock_client.max_pool_connections = DEFAULT_POOL_LIMIT
         pooled_qldb_driver = PooledQldbDriver(MOCK_LEDGER_NAME)
 
-        session = pooled_qldb_driver.get_session()
+        session = pooled_qldb_driver._get_session()
         mock_bounded_semaphore().acquire.assert_called_once_with(timeout=DEFAULT_TIMEOUT_SECONDS)
         mock_atomic_integer().decrement.assert_called_once_with()
         mock_pooled_qldb_session.assert_called_once_with(mock_create_new_session(), mock_release_session)
@@ -324,8 +324,7 @@ class TestPooledQldbDriver(TestCase):
         pooled_qldb_driver._pool = Queue()
         pooled_qldb_driver._pool.put(mock_qldb_session)
 
-        session = pooled_qldb_driver.get_session()
-        mock_qldb_session._abort_or_close.assert_called_once_with()
+        session = pooled_qldb_driver._get_session()
         mock_pooled_qldb_session.assert_called_once_with(mock_qldb_session, mock_release_session)
         self.assertEqual(session, mock_pooled_qldb_session)
         mock_bounded_semaphore().acquire.assert_called_once_with(timeout=DEFAULT_TIMEOUT_SECONDS)
@@ -343,7 +342,7 @@ class TestPooledQldbDriver(TestCase):
         pooled_qldb_driver = PooledQldbDriver(MOCK_LEDGER_NAME)
         mock_pooled_qldb_session.side_effect = Exception
 
-        self.assertRaises(Exception, pooled_qldb_driver.get_session)
+        self.assertRaises(Exception, pooled_qldb_driver._get_session)
         mock_bounded_semaphore().acquire.assert_called_once_with(timeout=DEFAULT_TIMEOUT_SECONDS)
         mock_atomic_integer().decrement.assert_called_once_with()
         mock_bounded_semaphore().release.assert_called_once_with()
@@ -361,7 +360,7 @@ class TestPooledQldbDriver(TestCase):
         mock_session_pool_empty_error.return_value = Exception
         pooled_qldb_driver = PooledQldbDriver(MOCK_LEDGER_NAME)
 
-        self.assertRaises(Exception, pooled_qldb_driver.get_session)
+        self.assertRaises(Exception, pooled_qldb_driver._get_session)
         mock_session_pool_empty_error.assert_called_once_with(DEFAULT_TIMEOUT_SECONDS)
         mock_logger_debug.assert_called_once()
 
@@ -372,7 +371,7 @@ class TestPooledQldbDriver(TestCase):
         pooled_qldb_driver = PooledQldbDriver(MOCK_LEDGER_NAME)
         pooled_qldb_driver._is_closed = True
 
-        self.assertRaises(DriverClosedError, pooled_qldb_driver.get_session)
+        self.assertRaises(DriverClosedError, pooled_qldb_driver._get_session)
 
     @patch('pyqldb.driver.pooled_qldb_driver.logger.debug')
     @patch('pyqldb.driver.pooled_qldb_driver.SessionPoolEmptyError')
@@ -387,7 +386,7 @@ class TestPooledQldbDriver(TestCase):
         new_timeout = 20
         pooled_qldb_driver = PooledQldbDriver(MOCK_LEDGER_NAME, timeout=new_timeout)
 
-        self.assertRaises(Exception, pooled_qldb_driver.get_session)
+        self.assertRaises(Exception, pooled_qldb_driver._get_session)
         mock_bounded_semaphore().acquire.assert_called_once_with(timeout=new_timeout)
         mock_session_pool_empty_error.assert_called_once_with(new_timeout)
         mock_logger_debug.assert_called_once()
@@ -414,14 +413,34 @@ class TestPooledQldbDriver(TestCase):
     @patch('pyqldb.session.qldb_session.QldbSession')
     @patch('pyqldb.driver.pooled_qldb_driver.logger.debug')
     @patch('pyqldb.driver.base_qldb_driver.client')
-    def test_release_session(self, mock_client, mock_logger_debug, mock_qldb_session, mock_queue,
-                             mock_bounded_semaphore, mock_atomic_integer):
+    def test_release_session_for_active_session(self, mock_client, mock_logger_debug, mock_qldb_session, mock_queue,
+                                                mock_bounded_semaphore, mock_atomic_integer):
         mock_client.return_value = mock_client
         mock_client.max_pool_connections = DEFAULT_POOL_LIMIT
         pooled_qldb_driver = PooledQldbDriver(MOCK_LEDGER_NAME)
+        mock_qldb_session._is_closed = False
         pooled_qldb_driver._release_session(mock_qldb_session)
 
         mock_queue().put.assert_called_once_with(mock_qldb_session)
+        mock_bounded_semaphore().release.assert_called_once_with()
+        mock_atomic_integer().increment.assert_called_once_with()
+        mock_logger_debug.assert_called_once()
+
+    @patch('pyqldb.driver.pooled_qldb_driver.AtomicInteger')
+    @patch('pyqldb.driver.pooled_qldb_driver.BoundedSemaphore')
+    @patch('pyqldb.driver.pooled_qldb_driver.Queue')
+    @patch('pyqldb.session.qldb_session.QldbSession')
+    @patch('pyqldb.driver.pooled_qldb_driver.logger.debug')
+    @patch('pyqldb.driver.base_qldb_driver.client')
+    def test_release_session_for_closed_session(self, mock_client, mock_logger_debug, mock_qldb_session, mock_queue,
+                                                mock_bounded_semaphore, mock_atomic_integer):
+        mock_client.return_value = mock_client
+        mock_client.max_pool_connections = DEFAULT_POOL_LIMIT
+        pooled_qldb_driver = PooledQldbDriver(MOCK_LEDGER_NAME)
+        mock_qldb_session._is_closed = True
+        pooled_qldb_driver._release_session(mock_qldb_session)
+
+        mock_queue().put.assert_not_called()
         mock_bounded_semaphore().release.assert_called_once_with()
         mock_atomic_integer().increment.assert_called_once_with()
         mock_logger_debug.assert_called_once()
@@ -454,7 +473,7 @@ class TestPooledQldbDriver(TestCase):
             count += 1
 
     @patch('pyqldb.driver.base_qldb_driver.client')
-    @patch('pyqldb.driver.pooled_qldb_driver.PooledQldbDriver.get_session')
+    @patch('pyqldb.driver.pooled_qldb_driver.PooledQldbDriver._get_session')
     def test_execute_lambda(self, mock_get_session, mock_client):
         mock_client.return_value = mock_client
         mock_lambda = Mock()
@@ -466,4 +485,116 @@ class TestPooledQldbDriver(TestCase):
 
         mock_get_session.assert_called_once_with()
         mock_session.execute_lambda.assert_called_once_with(mock_lambda, mock_lambda)
+        self.assertEqual(result, MOCK_MESSAGE)
+
+    @patch('pyqldb.driver.base_qldb_driver.client')
+    @patch('pyqldb.driver.pooled_qldb_driver.PooledQldbDriver._get_session')
+    def test_execute_lambda_with_InvalidSessionException(self, mock_get_session, mock_client):
+        """
+        The test asserts that if an InvalidSessionException is thrown by session.execute_lambda, the
+        driver calls _get_session
+        """
+        mock_client.return_value = mock_client
+        mock_lambda = Mock()
+        mock_session = mock_get_session.return_value.__enter__.return_value
+
+        mock_invalid_session_error_message = {'Error': {'Code': 'InvalidSessionException',
+                                                        'Message': MOCK_MESSAGE}}
+        mock_invalid_session_error = ClientError(mock_invalid_session_error_message, MOCK_MESSAGE)
+        mock_session.execute_lambda.side_effect = [mock_invalid_session_error, mock_invalid_session_error, MOCK_MESSAGE]
+        driver = PooledQldbDriver(MOCK_LEDGER_NAME)
+
+        result = driver.execute_lambda(mock_lambda, mock_lambda)
+
+        self.assertEqual(mock_get_session.call_count, 3)
+        self.assertEqual(result, MOCK_MESSAGE)
+
+    @patch('pyqldb.driver.base_qldb_driver.client')
+    @patch('pyqldb.driver.pooled_qldb_driver.PooledQldbDriver._get_session')
+    def test_execute_lambda_with_StartTransactionError(self, mock_get_session, mock_client):
+        """
+        The test asserts that if an StartTransactionError is thrown by session.execute_lambda, the
+        driver calls _get_session.
+        """
+        mock_client.return_value = mock_client
+        mock_lambda = Mock()
+        mock_session = mock_get_session.return_value.__enter__.return_value
+
+        mock_session.execute_lambda.side_effect = [StartTransactionError({}), StartTransactionError({}), MOCK_MESSAGE]
+        driver = PooledQldbDriver(MOCK_LEDGER_NAME)
+
+        result = driver.execute_lambda(mock_lambda, mock_lambda)
+
+        self.assertEqual(mock_get_session.call_count, 3)
+        self.assertEqual(result, MOCK_MESSAGE)
+
+    @patch('pyqldb.session.qldb_session.QldbSession')
+    @patch('pyqldb.session.qldb_session.QldbSession')
+    def test_return_session_with_invalid_session_exception(self, mock_session_1, mock_session_2):
+        """
+        The test asserts that a bad session is not returned to the pool.
+        We add two mock sessions to the pool. mock_session_1.execute_lambda returns an InvalidSessionException
+        and mock_session_2.execute_lambda succeeds.
+        After executing driver.execute_lambda we assert if the pool has just one session which should be
+        mock_session_2.
+        """
+
+        mock_invalid_session_error_message = {'Error': {'Code': 'InvalidSessionException',
+                                                        'Message': MOCK_MESSAGE}}
+        mock_invalid_session_error = ClientError(mock_invalid_session_error_message, MOCK_MESSAGE)
+        mock_lambda = Mock()
+        mock_session_1.execute_lambda.side_effect = mock_invalid_session_error
+        mock_session_1._is_closed = True
+        mock_session_2.execute_lambda.return_value = MOCK_MESSAGE
+        mock_session_2._is_closed = False
+        driver = PooledQldbDriver(MOCK_LEDGER_NAME)
+        # adding sessions to the driver pool
+        driver._pool.put(mock_session_1)
+        driver._pool.put(mock_session_2)
+
+        result = driver.execute_lambda(mock_lambda)
+
+        self.assertEqual(mock_session_1.execute_lambda.call_count, 1)
+        self.assertEqual(mock_session_1._is_closed, True)
+        self.assertEqual(mock_session_2.execute_lambda.call_count, 1)
+        self.assertEqual(mock_session_2._is_closed, False)
+        self.assertEqual(driver._pool_permits._value, 10)
+        self.assertEqual(driver._pool.qsize(), 1)
+        self.assertEqual(mock_session_2, driver._pool.get_nowait())
+
+        self.assertEqual(result, MOCK_MESSAGE)
+
+    @patch('pyqldb.session.qldb_session.QldbSession')
+    @patch('pyqldb.session.qldb_session.QldbSession')
+    def test_return_session_with_start_transaction_error(self, mock_session_1, mock_session_2):
+        """
+        The test asserts that a bad session is not returned to the pool.
+        We add two mock sessions to the pool. mock_session_1.execute_lambda returns an StartTransactionError
+        and mock_session_2.execute_lambda succeeds.
+        After executing driver.execute_lambda we assert if the pool has both the sessions.
+
+        """
+
+        mock_invalid_session_error = StartTransactionError({})
+        mock_lambda = Mock()
+        mock_session_1.execute_lambda.side_effect = mock_invalid_session_error
+        mock_session_1._is_closed = False
+        mock_session_2.execute_lambda.return_value = MOCK_MESSAGE
+        mock_session_2._is_closed = False
+        driver = PooledQldbDriver(MOCK_LEDGER_NAME)
+        # adding sessions to the driver pool
+        driver._pool.put(mock_session_1)
+        driver._pool.put(mock_session_2)
+
+        result = driver.execute_lambda(mock_lambda)
+
+        self.assertEqual(mock_session_1.execute_lambda.call_count, 1)
+        self.assertEqual(mock_session_1._is_closed, False)
+        self.assertEqual(mock_session_2.execute_lambda.call_count, 1)
+        self.assertEqual(mock_session_2._is_closed, False)
+        self.assertEqual(driver._pool.qsize(), 2)
+        self.assertEqual(driver._pool_permits._value, 10)
+        self.assertEqual(mock_session_1, driver._pool.get_nowait())
+        self.assertEqual(mock_session_2, driver._pool.get_nowait())
+
         self.assertEqual(result, MOCK_MESSAGE)

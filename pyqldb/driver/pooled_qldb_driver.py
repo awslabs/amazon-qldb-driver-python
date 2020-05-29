@@ -12,8 +12,9 @@ from queue import Queue, Empty
 from logging import getLogger
 from threading import BoundedSemaphore
 
-from ..errors import DriverClosedError, SessionPoolEmptyError
-from ..execution.executable import Executable
+from botocore.exceptions import ClientError
+
+from ..errors import DriverClosedError, SessionPoolEmptyError, is_invalid_session_exception, StartTransactionError
 from ..session.pooled_qldb_session import PooledQldbSession
 from ..util.atomic_integer import AtomicInteger
 from .base_qldb_driver import BaseQldbDriver
@@ -99,6 +100,7 @@ class PooledQldbDriver(BaseQldbDriver):
 
     [2]: `Botocore Config Reference <https://botocore.amazonaws.com/v1/documentation/api/latest/reference/config.html>`_.
     """
+
     def __init__(self, ledger_name, retry_limit=4, read_ahead=0, executor=None, region_name=None, verify=None,
                  endpoint_url=None, aws_access_key_id=None, aws_secret_access_key=None, aws_session_token=None,
                  config=None, boto3_session=None, pool_limit=0, timeout=DEFAULT_TIMEOUT_SECONDS):
@@ -175,10 +177,19 @@ class PooledQldbDriver(BaseQldbDriver):
 
         :raises LambdaAbortedError: If the lambda function calls :py:class:`pyqldb.execution.executor.Executor.abort`.
         """
-        with self.get_session() as session:
-            return session.execute_lambda(query_lambda, retry_indicator)
+        while True:
+            try:
+                with self._get_session() as session:
+                    return session.execute_lambda(query_lambda, retry_indicator)
+            except StartTransactionError:
+                pass
+            except ClientError as ce:
+                if is_invalid_session_exception(ce):
+                    pass
+                else:
+                    raise ce
 
-    def get_session(self):
+    def _get_session(self):
         """
         This method will attempt to retrieve an active, existing session, or it will start a new session with QLDB if
         none are available and the session pool limit has not been reached. If the pool limit has been reached, it will
@@ -200,11 +211,9 @@ class PooledQldbDriver(BaseQldbDriver):
             self._pool_permits_counter.decrement()
             try:
                 try:
-                    while True:
-                        cur_session = self._pool.get_nowait()
-                        if cur_session._abort_or_close():
-                            logger.debug('Reusing session from pool. Session ID: {}.'.format(cur_session.session_id))
-                            return PooledQldbSession(cur_session, self._release_session)
+                    cur_session = self._pool.get_nowait()
+                    logger.debug('Reusing session from pool. Session ID: {}.'.format(cur_session.session_id))
+                    return PooledQldbSession(cur_session, self._release_session)
                 except Empty:
                     pass
 
@@ -222,7 +231,10 @@ class PooledQldbDriver(BaseQldbDriver):
         """
         Release a session back into the pool.
         """
-        self._pool.put(session)
+
+        if not session._is_closed:
+            self._pool.put(session)
+
         self._pool_permits.release()
         self._pool_permits_counter.increment()
-        logger.debug('Session returned to pool; size is now: {}'.format(self._pool.qsize()))
+        logger.debug('Number of sessions in pool : {}'.format(self._pool.qsize()))
