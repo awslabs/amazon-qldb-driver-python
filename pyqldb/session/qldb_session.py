@@ -15,7 +15,7 @@ import random
 from botocore.exceptions import ClientError
 
 from ..errors import is_invalid_session_exception, is_occ_conflict_exception, is_retriable_exception, \
-    SessionClosedError, LambdaAbortedError
+    SessionClosedError, LambdaAbortedError, StartTransactionError
 from ..communication.session_client import SessionClient
 from ..cursor.buffered_cursor import BufferedCursor
 from ..cursor.stream_cursor import StreamCursor
@@ -131,13 +131,10 @@ class QldbSession(BaseQldbSession):
 
         :raises IllegalStateError: When the commit digest from commit transaction result does not match.
 
-        :raises SessionClosedError: When this session is closed.
-
         :raises ClientError: When there is an error executing against QLDB.
 
         :raises LambdaAbortedError: If the lambda function calls :py:class:`pyqldb.execution.executor.Executor.abort`.
         """
-        self.throw_if_closed()
 
         execution_attempt = 0
         while True:
@@ -154,16 +151,18 @@ class QldbSession(BaseQldbSession):
             except LambdaAbortedError as lae:
                 self._no_throw_abort(transaction)
                 raise lae
+            except StartTransactionError as ste:
+                #TODO Currently this results in execeptions such as RateLimitExceeded to pick up a new session.
+                raise ste
             except ClientError as ce:
+                if is_invalid_session_exception(ce):
+                    self._is_closed = True
+                    raise ce
                 self._no_throw_abort(transaction)
-                if is_invalid_session_exception(ce) or is_occ_conflict_exception(ce) or is_retriable_exception(ce):
+                if is_occ_conflict_exception(ce) or is_retriable_exception(ce):
                     logger.warning('OCC conflict or retriable exception occurred: {}'.format(ce))
                     if execution_attempt >= self._retry_limit:
                         raise ce
-                    if is_invalid_session_exception(ce):
-                        logger.info('Creating a new session to QLDB; previous session is no longer valid: {}'.
-                                    format(ce))
-                        self._session = SessionClient.start_session(self._session.ledger_name, self._session.client)
                 else:
                     raise ce
 
@@ -178,40 +177,23 @@ class QldbSession(BaseQldbSession):
         :rtype: :py:class:`pyqldb.transaction.transaction.Transaction`
         :return: A new transaction.
 
-        :raises SessionClosedError: When this session is closed.
+        :raises StartTransactionError: When this session fails to start a new transaction on the session.
         """
-        self.throw_if_closed()
-
-        transaction_id = self._session.start_transaction().get('TransactionId')
-        transaction = Transaction(self._session, self._read_ahead, transaction_id, self._executor)
-        return transaction
-
-    def throw_if_closed(self):
-        """
-        Check and throw if this session is closed.
-
-        :raises SessionClosedError: When this session is closed.
-        """
-        if self._is_closed:
-            logger.error(SessionClosedError())
-            raise SessionClosedError
-
-    def _abort_or_close(self):
-        """
-        Determine if this session is alive by sending an abort message. This should only be used when the session is
-        known to not be in use, otherwise the state will be abandoned.
-
-        :rtype: bool
-        :return: True if the session is alive, false otherwise.
-        """
-        if self._is_closed:
-            return False
         try:
-            self._session.abort_transaction()
-            return True
-        except ClientError:
-            self._is_closed = True
-            return False
+            transaction_id = self._session.start_transaction().get('TransactionId')
+            transaction = Transaction(self._session, self._read_ahead, transaction_id, self._executor)
+            return transaction
+        except ClientError as e:
+            raise StartTransactionError(e.response)
+
+    @staticmethod
+    def _retry_sleep(attempt_number):
+        """
+        Sleeps an exponentially increasing amount relative to `attempt_number`.
+        """
+        jitter_rand = random.random()
+        exponential_back_off = min(SLEEP_CAP_MS, pow(SLEEP_BASE_MS, attempt_number))
+        sleep((jitter_rand * (exponential_back_off + 1))/1000)
 
     def _no_throw_abort(self, transaction):
         """
@@ -224,12 +206,3 @@ class QldbSession(BaseQldbSession):
                 transaction.abort()
         except ClientError as ce:
             logger.warning('Ignored error aborting transaction during execution: {}'.format(ce))
-
-    @staticmethod
-    def _retry_sleep(attempt_number):
-        """
-        Sleeps an exponentially increasing amount relative to `attempt_number`.
-        """
-        jitter_rand = random.random()
-        exponential_back_off = min(SLEEP_CAP_MS, pow(SLEEP_BASE_MS, attempt_number))
-        sleep((jitter_rand * (exponential_back_off + 1))/1000)

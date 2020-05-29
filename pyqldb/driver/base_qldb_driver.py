@@ -130,13 +130,6 @@ class BaseQldbDriver(ABC):
         self.close()
 
     @abstractmethod
-    def get_session(self):
-        """
-        Retrieve a QldbSession object. This method must be overridden.
-        """
-        pass
-
-    @abstractmethod
     def execute_lambda(self, query_lambda, retry_indicator):
         """
         Implicitly start a transaction, execute the lambda function, and commit the transaction, retrying up to the

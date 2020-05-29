@@ -46,6 +46,12 @@ class SessionPoolEmptyError(Exception):
                          'before retrying.'.format(str(timeout)))
 
 
+class StartTransactionError(Exception):
+    def __init__(self, response):
+        super().__init__('Failed to start transaction')
+        self.response = response
+
+
 def is_occ_conflict_exception(e):
     """
     Is the exception an OccConflictException?
