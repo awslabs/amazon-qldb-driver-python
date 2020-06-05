@@ -53,23 +53,23 @@ class TestTransaction(TestCase):
         mock_to_qldb_hash.assert_called_once_with(MOCK_ID)
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
-    @patch('pyqldb.transaction.transaction.Transaction.close')
+    @patch('pyqldb.transaction.transaction.Transaction._close')
     def test_context_manager(self, mock_close, mock_executor, mock_session):
         with Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor):
             pass
         mock_close.assert_called_once_with()
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
-    @patch('pyqldb.transaction.transaction.Transaction.close')
+    @patch('pyqldb.transaction.transaction.Transaction._close')
     def test_context_manager_with_invalid_session_error(self, mock_close, mock_executor, mock_session):
         mock_invalid_session_error_message = {'Error': {'Code': 'InvalidSessionException',
                                                         'Message': MOCK_ERROR_MESSAGE}}
         mock_invalid_session_error = ClientError(mock_invalid_session_error_message, MOCK_ERROR_MESSAGE)
-        mock_session.execute_statement.side_effect = mock_invalid_session_error
+        mock_session._execute_statement.side_effect = mock_invalid_session_error
 
         with self.assertRaises(ClientError):
             with Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor) as transaction:
-                transaction.execute_statement('select * from foo')
+                transaction._execute_statement('select * from foo')
         mock_close.assert_called_once_with()
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
@@ -85,10 +85,10 @@ class TestTransaction(TestCase):
     def test_abort_when_not_closed(self, mock_internal_close, mock_executor, mock_session):
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
         transaction._is_closed = False
-        transaction.abort()
+        transaction._abort()
 
         mock_internal_close.assert_called_once_with()
-        mock_session.abort_transaction.assert_called_once_with()
+        mock_session._abort_transaction.assert_called_once_with()
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
     @patch('pyqldb.transaction.transaction.Transaction._internal_close')
@@ -96,26 +96,26 @@ class TestTransaction(TestCase):
 
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
         transaction._is_closed = True
-        transaction.abort()
+        transaction._abort()
 
         mock_internal_close.assert_not_called()
-        mock_session.abort_transaction.assert_not_called()
+        mock_session._abort_transaction.assert_not_called()
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
-    @patch('pyqldb.transaction.transaction.Transaction.abort')
+    @patch('pyqldb.transaction.transaction.Transaction._abort')
     def test_close(self, mock_abort, mock_executor, mock_session):
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
-        transaction.close()
+        transaction._close()
         mock_abort.assert_called_once_with()
 
     @patch('pyqldb.transaction.transaction.logger.warning')
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
-    @patch('pyqldb.transaction.transaction.Transaction.abort')
+    @patch('pyqldb.transaction.transaction.Transaction._abort')
     def test_close_client_error(self, mock_abort, mock_executor, mock_logger_warning, mock_session):
         ce = ClientError(MOCK_CLIENT_ERROR_MESSAGE, MOCK_ERROR_MESSAGE)
         mock_abort.side_effect = ce
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
-        transaction.close()
+        transaction._close()
         mock_abort.assert_called_once_with()
         mock_logger_warning.assert_called_once()
 
@@ -123,12 +123,12 @@ class TestTransaction(TestCase):
     @patch('pyqldb.transaction.transaction.Transaction._internal_close')
     def test_commit(self, mock_internal_close, mock_executor, mock_session):
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
-        mock_session.commit_transaction.return_value = {"TransactionId": transaction.transaction_id,
+        mock_session._commit_transaction.return_value = {"TransactionId": transaction.transaction_id,
                                                         "CommitDigest": transaction._txn_hash.get_qldb_hash()}
-        transaction.commit()
+        transaction._commit()
 
-        mock_session.commit_transaction.assert_called_once_with(transaction.transaction_id,
-                                                                transaction._txn_hash.get_qldb_hash())
+        mock_session._commit_transaction.assert_called_once_with(transaction.transaction_id,
+                                                                 transaction._txn_hash.get_qldb_hash())
         mock_internal_close.assert_called_once_with()
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
@@ -136,9 +136,9 @@ class TestTransaction(TestCase):
     def test_commit_with_non_matching_commit_result(self, mock_internal_close, mock_executor,
                                                     mock_session):
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
-        mock_session.commit_transaction.return_value = {"CommitDigest": 'Non-matching CommitDigest'}
+        mock_session._commit_transaction.return_value = {"CommitDigest": 'Non-matching CommitDigest'}
 
-        self.assertRaises(IllegalStateError, transaction.commit)
+        self.assertRaises(IllegalStateError, transaction._commit)
         mock_internal_close.assert_called_once_with()
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
@@ -146,7 +146,7 @@ class TestTransaction(TestCase):
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
         transaction._is_closed = True
 
-        self.assertRaises(TransactionClosedError, transaction.commit)
+        self.assertRaises(TransactionClosedError, transaction._commit)
 
     @patch('pyqldb.transaction.transaction.Transaction._internal_close')
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
@@ -156,12 +156,12 @@ class TestTransaction(TestCase):
         mock_is_occ_conflict_exception.return_value = False
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
         ce = ClientError(MOCK_CLIENT_ERROR_MESSAGE, MOCK_ERROR_MESSAGE)
-        mock_session.commit_transaction.side_effect = ce
+        mock_session._commit_transaction.side_effect = ce
 
-        self.assertRaises(ClientError, transaction.commit)
-        mock_session.commit_transaction.assert_called_once_with(transaction._id, transaction._txn_hash.get_qldb_hash())
+        self.assertRaises(ClientError, transaction._commit)
+        mock_session._commit_transaction.assert_called_once_with(transaction._id, transaction._txn_hash.get_qldb_hash())
         mock_is_occ_conflict_exception.assert_called_once_with(ce)
-        mock_session.abort_transaction.assert_called_once_with()
+        mock_session._abort_transaction.assert_called_once_with()
         self.assertEqual(mock_internal_close.call_count, 2)
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
@@ -172,10 +172,10 @@ class TestTransaction(TestCase):
         mock_is_occ_conflict_exception.return_value = True
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
         ce = ClientError(MOCK_CLIENT_ERROR_MESSAGE, MOCK_ERROR_MESSAGE)
-        mock_session.commit_transaction.side_effect = ce
+        mock_session._commit_transaction.side_effect = ce
 
-        self.assertRaises(ClientError, transaction.commit)
-        mock_session.commit_transaction.assert_called_once_with(transaction._id, transaction._txn_hash.get_qldb_hash())
+        self.assertRaises(ClientError, transaction._commit)
+        mock_session._commit_transaction.assert_called_once_with(transaction._id, transaction._txn_hash.get_qldb_hash())
         mock_internal_close.assert_called_once_with()
         mock_is_occ_conflict_exception.assert_called_once_with(ce)
 
@@ -186,12 +186,12 @@ class TestTransaction(TestCase):
                                                       mock_session):
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
         ce = ClientError(MOCK_CLIENT_ERROR_MESSAGE, MOCK_ERROR_MESSAGE)
-        mock_session.commit_transaction.side_effect = ce
+        mock_session._commit_transaction.side_effect = ce
         ce2 = ClientError(MOCK_CLIENT_ERROR_MESSAGE, MOCK_ERROR_MESSAGE)
-        mock_session.abort_transaction.side_effect = ce2
+        mock_session._abort_transaction.side_effect = ce2
 
-        self.assertRaises(ClientError, transaction.commit)
-        mock_session.commit_transaction.assert_called_once_with(transaction._id, transaction._txn_hash.get_qldb_hash())
+        self.assertRaises(ClientError, transaction._commit)
+        mock_session._commit_transaction.assert_called_once_with(transaction._id, transaction._txn_hash.get_qldb_hash())
         mock_logger_warning.assert_called_once()
         self.assertEqual(mock_internal_close.call_count, 2)
 
@@ -201,11 +201,11 @@ class TestTransaction(TestCase):
     def test_execute_statement_read_ahead_0(self, mock_cursor, mock_update_hash, mock_executor, mock_session):
         mock_update_hash.return_value = None
         mock_cursor.return_value = mock_cursor
-        mock_session.execute_statement.return_value = MOCK_FIRST_PAGE_RESULT
+        mock_session._execute_statement.return_value = MOCK_FIRST_PAGE_RESULT
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
-        cursor = transaction.execute_statement(MOCK_STATEMENT)
+        cursor = transaction._execute_statement(MOCK_STATEMENT)
 
-        mock_session.execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, ())
+        mock_session._execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, ())
         mock_update_hash.assert_called_once_with(MOCK_STATEMENT, ())
         mock_cursor.assert_called_once_with(MOCK_STATEMENT_RESULT, mock_session, MOCK_ID)
         self.assertEqual(transaction._cursors, [mock_cursor])
@@ -217,11 +217,11 @@ class TestTransaction(TestCase):
     def test_execute_statement_read_ahead_2(self, mock_cursor, mock_update_hash, mock_executor, mock_session):
         mock_update_hash.return_value = None
         mock_cursor.return_value = mock_cursor
-        mock_session.execute_statement.return_value = MOCK_FIRST_PAGE_RESULT
+        mock_session._execute_statement.return_value = MOCK_FIRST_PAGE_RESULT
         transaction = Transaction(mock_session, 2, MOCK_ID, mock_executor)
-        cursor = transaction.execute_statement(MOCK_STATEMENT)
+        cursor = transaction._execute_statement(MOCK_STATEMENT)
 
-        mock_session.execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, ())
+        mock_session._execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, ())
         mock_update_hash.assert_called_once_with(MOCK_STATEMENT, ())
         mock_cursor.assert_called_once_with(MOCK_STATEMENT_RESULT, mock_session, MOCK_ID, 2, mock_executor)
         self.assertEqual(transaction._cursors, [mock_cursor])
@@ -233,12 +233,12 @@ class TestTransaction(TestCase):
     def test_execute_statement_with_parameters(self, mock_cursor, mock_update_hash, mock_executor, mock_session):
         mock_update_hash.return_value = None
         mock_cursor.return_value = mock_cursor
-        mock_session.execute_statement.return_value = MOCK_FIRST_PAGE_RESULT
+        mock_session._execute_statement.return_value = MOCK_FIRST_PAGE_RESULT
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
-        cursor = transaction.execute_statement(MOCK_STATEMENT, MOCK_PARAMETER_1, MOCK_PARAMETER_2)
+        cursor = transaction._execute_statement(MOCK_STATEMENT, MOCK_PARAMETER_1, MOCK_PARAMETER_2)
 
-        mock_session.execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, (MOCK_PARAMETER_1,
-                                                               MOCK_PARAMETER_2))
+        mock_session._execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, (MOCK_PARAMETER_1,
+                                                                                          MOCK_PARAMETER_2))
         mock_update_hash.assert_called_once_with(MOCK_STATEMENT, (MOCK_PARAMETER_1, MOCK_PARAMETER_2))
         mock_cursor.assert_called_once_with(MOCK_STATEMENT_RESULT, mock_session, MOCK_ID)
         self.assertEqual(transaction._cursors, [mock_cursor])
@@ -250,12 +250,12 @@ class TestTransaction(TestCase):
     def test_execute_statement_with_native_parameters(self, mock_cursor, mock_update_hash, mock_executor, mock_session):
         mock_update_hash.return_value = None
         mock_cursor.return_value = mock_cursor
-        mock_session.execute_statement.return_value = MOCK_FIRST_PAGE_RESULT
+        mock_session._execute_statement.return_value = MOCK_FIRST_PAGE_RESULT
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
-        cursor = transaction.execute_statement(MOCK_STATEMENT, NATIVE_PARAMETER_1, NATIVE_PARAMETER_2)
+        cursor = transaction._execute_statement(MOCK_STATEMENT, NATIVE_PARAMETER_1, NATIVE_PARAMETER_2)
 
-        mock_session.execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, (ION_PARAMETER_1,
-                                                               ION_PARAMETER_1))
+        mock_session._execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, (ION_PARAMETER_1,
+                                                                                          ION_PARAMETER_1))
         mock_update_hash.assert_called_once_with(MOCK_STATEMENT, (ION_PARAMETER_1, ION_PARAMETER_2))
         mock_cursor.assert_called_once_with(MOCK_STATEMENT_RESULT, mock_session, MOCK_ID)
         self.assertEqual(transaction._cursors, [mock_cursor])
@@ -266,14 +266,14 @@ class TestTransaction(TestCase):
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
         
         with self.assertRaises(TypeError):
-            transaction.execute_statement(MOCK_STATEMENT, INVALID_MOCK_PARAMETER)
+            transaction._execute_statement(MOCK_STATEMENT, INVALID_MOCK_PARAMETER)
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
     def test_execute_statement_when_closed(self, mock_executor, mock_session):
         transaction = Transaction(mock_session, MOCK_READ_AHEAD, MOCK_ID, mock_executor)
         transaction._is_closed = True
 
-        self.assertRaises(TransactionClosedError, transaction.execute_statement, MOCK_STATEMENT)
+        self.assertRaises(TransactionClosedError, transaction._execute_statement, MOCK_STATEMENT)
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
     @patch('pyqldb.cursor.stream_cursor.StreamCursor')

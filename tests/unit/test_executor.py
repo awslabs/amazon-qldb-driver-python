@@ -37,9 +37,9 @@ class TestExecutor(TestCase):
 
     @patch('pyqldb.cursor.stream_cursor.StreamCursor')
     def test_execute_statement(self, mock_cursor, mock_transaction):
-        mock_transaction.execute_statement.return_value = mock_cursor
+        mock_transaction._execute_statement.return_value = mock_cursor
         executor = Executor(mock_transaction)
 
         cursor = executor.execute_statement(MOCK_STATEMENT, MOCK_PARAMETER_1, MOCK_PARAMETER_2)
-        mock_transaction.execute_statement.assert_called_once_with(MOCK_STATEMENT, MOCK_PARAMETER_1, MOCK_PARAMETER_2)
+        mock_transaction._execute_statement.assert_called_once_with(MOCK_STATEMENT, MOCK_PARAMETER_1, MOCK_PARAMETER_2)
         self.assertEqual(cursor, mock_cursor)

@@ -51,5 +51,5 @@ class Executor:
 
         :raises TransactionClosedError: When this transaction is closed.
         """
-        cursor = self._transaction.execute_statement(statement, *parameters)
+        cursor = self._transaction._execute_statement(statement, *parameters)
         return cursor

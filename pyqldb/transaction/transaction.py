@@ -24,13 +24,13 @@ logger = getLogger(__name__)
 
 class Transaction:
     """
-    A class representing a QLDB transaction.
+    A class representing a QLDB transaction. This is meant for internal use only.
 
     Every transaction is tied to a parent QldbSession, meaning that if the parent session is closed or
     invalidated, the child transaction is automatically closed and cannot be used. Only one transaction can be active at
     any given time per parent session, and thus every transaction should call
-    :py:meth:`pyqldb.transaction.transaction.Transaction.abort` or
-    :py:meth:`pyqldb.transaction.transaction.Transaction.commit` when it is no longer needed, or when a new transaction
+    :py:meth:`pyqldb.transaction.transaction.Transaction._abort` or
+    :py:meth:`pyqldb.transaction.transaction.Transaction._commit` when it is no longer needed, or when a new transaction
     is desired from the parent session.
 
     An InvalidSessionException indicates that the parent session is dead, and a new transaction cannot be created
@@ -76,7 +76,7 @@ class Transaction:
         """
         Context Manager function to support the 'with' statement.
         """
-        self.close()
+        self._close()
 
     @property
     def is_closed(self):
@@ -92,24 +92,24 @@ class Transaction:
         """
         return self._id
 
-    def abort(self):
+    def _abort(self):
         """
         Abort this transaction and close child cursors. No-op if already closed by commit or previous abort.
         """
         if not self._is_closed:
             self._internal_close()
-            self._session.abort_transaction()
+            self._session._abort_transaction()
 
-    def close(self):
+    def _close(self):
         """
         Close this transaction.
         """
         try:
-            self.abort()
+            self._abort()
         except ClientError as ce:
             logger.warning('Ignored error aborting transaction when closing: {}'.format(ce))
 
-    def commit(self):
+    def _commit(self):
         """
         Commit this transaction and close child cursors.
 
@@ -123,7 +123,7 @@ class Transaction:
             raise TransactionClosedError
 
         try:
-            commit_transaction_result = self._session.commit_transaction(self._id, self._txn_hash.get_qldb_hash())
+            commit_transaction_result = self._session._commit_transaction(self._id, self._txn_hash.get_qldb_hash())
             if self._txn_hash.get_qldb_hash() != commit_transaction_result.get('CommitDigest'):
                 raise IllegalStateError("Transaction's commit digest did not match returned value from QLDB. "
                                         "Please retry with a new transaction. Transaction ID: {}".format(self._id))
@@ -131,12 +131,12 @@ class Transaction:
             if is_occ_conflict_exception(ce):
                 # Avoid sending courtesy abort since we know transaction is dead on OCC conflict.
                 raise ce
-            self.close()
+            self._close()
             raise ce
         finally:
             self._internal_close()
 
-    def execute_statement(self, statement, *parameters):
+    def _execute_statement(self, statement, *parameters):
         """
         Execute the statement.
 
@@ -163,7 +163,7 @@ class Transaction:
 
         parameters = tuple(map(self._to_ion, parameters))
         self._update_hash(statement, parameters)
-        statement_result = self._session.execute_statement(self._id, statement, parameters)
+        statement_result = self._session._execute_statement(self._id, statement, parameters)
         first_page = statement_result.get('FirstPage')
         if self._read_ahead > 0:
             cursor = ReadAheadCursor(first_page, self._session, self._id, self._read_ahead, self._executor)

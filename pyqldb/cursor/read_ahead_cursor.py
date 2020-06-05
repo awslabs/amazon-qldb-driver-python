@@ -74,7 +74,7 @@ class ReadAheadCursor(StreamCursor):
         try:
             next_page_token = self._page.get('NextPageToken')
             while next_page_token is not None:
-                statement_result = self._session.fetch_page(self._transaction_id, next_page_token)
+                statement_result = self._session._fetch_page(self._transaction_id, next_page_token)
                 page = statement_result.get('Page')
                 while True:
                     try:

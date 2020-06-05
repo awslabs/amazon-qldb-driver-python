@@ -53,7 +53,7 @@ class SessionClient:
         """
         Context Manager function to support the 'with' statement.
         """
-        self.close()
+        self._close()
 
     @property
     def client(self):
@@ -83,7 +83,7 @@ class SessionClient:
         """
         return self._token
 
-    def abort_transaction(self):
+    def _abort_transaction(self):
         """
         Send request to abort the currently active transaction.
 
@@ -95,17 +95,17 @@ class SessionClient:
         abort_transaction_output = result.get('AbortTransaction')
         return abort_transaction_output
 
-    def close(self):
+    def _close(self):
         """
         Close this session.
         """
         try:
-            self.end_session()
+            self._end_session()
         except ClientError as ce:
             # We will only log issues closing the session, as QLDB will clean them after a timeout.
             logger.warning('Errors closing session: {}'.format(ce))
 
-    def commit_transaction(self, transaction_id, commit_digest):
+    def _commit_transaction(self, transaction_id, commit_digest):
         """
         Send request to commit the currently active transaction.
 
@@ -124,7 +124,7 @@ class SessionClient:
         commit_transaction_output = result.get('CommitTransaction')
         return commit_transaction_output
 
-    def end_session(self):
+    def _end_session(self):
         """
         Send request to end the independent session represented by the instance of this class.
 
@@ -136,7 +136,7 @@ class SessionClient:
         end_session_output = result.get('EndSession')
         return end_session_output
 
-    def execute_statement(self, transaction_id, statement, parameters):
+    def _execute_statement(self, transaction_id, statement, parameters):
         """
         Send an execute request with parameters to QLDB.
 
@@ -161,7 +161,7 @@ class SessionClient:
         statement_result = result.get('ExecuteStatement')
         return statement_result
 
-    def fetch_page(self, transaction_id, next_page_token):
+    def _fetch_page(self, transaction_id, next_page_token):
         """
         Send fetch result request to QLDB, retrieving the next chunk of data for the result.
 
@@ -180,7 +180,7 @@ class SessionClient:
         statement_result = result.get('FetchPage')
         return statement_result
 
-    def start_transaction(self):
+    def _start_transaction(self):
         """
         Send request to start a transaction.
 
@@ -201,7 +201,7 @@ class SessionClient:
         return result
 
     @staticmethod
-    def start_session(ledger_name, client):
+    def _start_session(ledger_name, client):
         """
         Factory method for constructing a new :py:class:`pyqldb.communication.session_client.SessionClient`, creating a
         new session to QLDB on construction.

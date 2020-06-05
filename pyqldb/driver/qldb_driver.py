@@ -174,7 +174,7 @@ class QldbDriver():
         self._is_closed = True
         while not self._pool.empty():
             cur_session = self._pool.get_nowait()
-            cur_session.end_session()
+            cur_session._end_session()
 
     def list_tables(self):
         """
@@ -221,7 +221,7 @@ class QldbDriver():
         while True:
             try:
                 with self._get_session() as session:
-                    return session.execute_lambda(query_lambda, retry_indicator)
+                    return session._execute_lambda(query_lambda, retry_indicator)
             except StartTransactionError:
                 pass
             except ClientError as ce:
@@ -252,7 +252,7 @@ class QldbDriver():
         """
         Create a new QldbSession object.
         """
-        session_client = SessionClient.start_session(self._ledger_name, self._client)
+        session_client = SessionClient._start_session(self._ledger_name, self._client)
         return QldbSession(session_client, self._read_ahead, self._retry_limit, self._executor,
                            self._release_session)
 

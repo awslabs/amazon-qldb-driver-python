@@ -21,10 +21,10 @@ from ..cursor.stream_cursor import StreamCursor
 from ..execution.executor import Executor
 from ..transaction.transaction import Transaction
 
-
 logger = getLogger(__name__)
 SLEEP_CAP_MS = 5000
 SLEEP_BASE_MS = 10
+
 
 class QldbSession():
     """
@@ -35,26 +35,13 @@ class QldbSession():
     QldbSession is tied to the underlying session, which is not indefinite, and on expiry this QldbSession will become
     invalid, and a new QldbSession needs to be created from the parent driver in order to continue usage.
 
-    When a QldbSession is no longer needed, :py:meth:`pyqldb.session.qldb_session.QldbSession.end_session` should
+    When a QldbSession is no longer needed, :py:meth:`pyqldb.session.qldb_session.QldbSession._end_session` should
     be invoked in order to clean up any resources.
 
     See :py:class:`pyqldb.driver.qldb_driver.QldbDriver` for an example of session lifecycle management,
     allowing the re-use of sessions when possible. There should only be one thread interacting with a session at any
     given time.
-
-    There are three methods of execution, ranging from simple to complex; the first two are recommended for inbuilt
-    error handling:
-     - :py:meth:`pyqldb.session.qldb_session.QldbSession.execute_statement` allows for a single statement to be executed
-       within a transaction where the transaction is implicitly created and committed, and any recoverable errors are
-       transparently handled.
-     - :py:meth:`pyqldb.session.qldb_session.QldbSession.execute_lambda` allows for more complex execution sequences
-       where more than one execution can occur, as well as other method calls. The transaction is implicitly created and
-       committed, and any recoverable errors are transparently handled.
-     - :py:meth:`pyqldb.session.qldb_session.QldbSession.start_transaction` allows for full control over when the
-       transaction is committed and leaves the responsibility of OCC conflict handling up to the user. Transactions'
-       methods cannot be automatically retried, as the state of the transaction is ambiguous in the case of an
-       unexpected error.
-
+    
     :type session: :py:class:`pyqldb.communication.session_client.SessionClient`
     :param session: The session object representing a communication channel with QLDB.
 
@@ -70,6 +57,7 @@ class QldbSession():
     :type return_session_to_pool: :function
     :param return_session_to_pool: A callback that describes how the session will be returned to the pool.
     """
+
     def __init__(self, session, read_ahead, retry_limit, executor, return_session_to_pool):
         self._is_closed = False
         self._read_ahead = read_ahead
@@ -111,21 +99,21 @@ class QldbSession():
         """
         return self._session.token
 
-    def close(self):
+    def _close(self):
         """
         Close this `QldbSession`.
         """
         self._is_closed = True
 
-    def end_session(self):
+    def _end_session(self):
         """
         End this session. No-op if already closed.
         """
         if not self._is_closed:
             self._is_closed = True
-            self._session.close()
+            self._session._close()
 
-    def execute_lambda(self, query_lambda, retry_indicator=lambda execution_attempt: None):
+    def _execute_lambda(self, query_lambda, retry_indicator=lambda execution_attempt: None):
         """
         Implicitly start a transaction, execute the lambda function, and commit the transaction, retrying up to the
         retry limit if an OCC conflict or retriable exception occurs.
@@ -160,20 +148,17 @@ class QldbSession():
         while True:
             transaction = None
             try:
-                transaction = self.start_transaction()
+                transaction = self._start_transaction()
                 result = query_lambda(Executor(transaction))
                 if isinstance(result, StreamCursor):
                     # If someone accidentally returned a StreamCursor object which would become invalidated by the
                     # commit, automatically buffer it to allow them to use the result anyway.
                     result = BufferedCursor(result)
-                transaction.commit()
+                transaction._commit()
                 return result
-            except LambdaAbortedError as lae:
+            except (LambdaAbortedError, StartTransactionError) as e:
                 self._no_throw_abort(transaction)
-                raise lae
-            except StartTransactionError as ste:
-                #TODO Currently this results in execeptions such as RateLimitExceeded to pick up a new session.
-                raise ste
+                raise e
             except ClientError as ce:
                 if is_invalid_session_exception(ce):
                     self._is_closed = True
@@ -190,7 +175,7 @@ class QldbSession():
             retry_indicator(execution_attempt)
             self._retry_sleep(execution_attempt)
 
-    def start_transaction(self):
+    def _start_transaction(self):
         """
         Start a transaction using an available database session.
 
@@ -200,7 +185,7 @@ class QldbSession():
         :raises StartTransactionError: When this session fails to start a new transaction on the session.
         """
         try:
-            transaction_id = self._session.start_transaction().get('TransactionId')
+            transaction_id = self._session._start_transaction().get('TransactionId')
             transaction = Transaction(self._session, self._read_ahead, transaction_id, self._executor)
             return transaction
         except ClientError as e:
@@ -221,7 +206,7 @@ class QldbSession():
         """
         jitter_rand = random.random()
         exponential_back_off = min(SLEEP_CAP_MS, pow(SLEEP_BASE_MS, attempt_number))
-        sleep((jitter_rand * (exponential_back_off + 1))/1000)
+        sleep((jitter_rand * (exponential_back_off + 1)) / 1000)
 
     def _no_throw_abort(self, transaction):
         """
@@ -229,9 +214,9 @@ class QldbSession():
         """
         try:
             if transaction is None:
-                self._session.abort_transaction()
+                self._session._abort_transaction()
             else:
-                transaction.abort()
+                transaction._abort()
         except ClientError as ce:
             logger.warning('Ignored error aborting transaction during execution: {}'.format(ce))
 
