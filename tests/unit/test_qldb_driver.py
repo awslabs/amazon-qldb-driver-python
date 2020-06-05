@@ -263,7 +263,7 @@ class TestQldbDriver(TestCase):
         mock_invalid_session_error_message = {'Error': {'Code': 'InvalidSessionException',
                                                         'Message': MOCK_MESSAGE}}
         mock_invalid_session_error = ClientError(mock_invalid_session_error_message, MOCK_MESSAGE)
-        mock_session_client.start_session.side_effect = mock_invalid_session_error
+        mock_session_client._start_session.side_effect = mock_invalid_session_error
 
         with self.assertRaises(ClientError):
             with QldbDriver(MOCK_LEDGER_NAME) as qldb_driver:
@@ -283,15 +283,15 @@ class TestQldbDriver(TestCase):
         qldb_driver._pool.put(mock_qldb_session2)
 
         qldb_driver.close()
-        mock_qldb_session1.end_session.assert_called_once_with()
-        mock_qldb_session2.end_session.assert_called_once_with()
+        mock_qldb_session1._end_session.assert_called_once_with()
+        mock_qldb_session2._end_session.assert_called_once_with()
 
     @patch('pyqldb.driver.qldb_driver.AtomicInteger')
     @patch('pyqldb.driver.qldb_driver.BoundedSemaphore')
     @patch('pyqldb.driver.qldb_driver.QldbDriver._release_session')
     @patch('pyqldb.driver.qldb_driver.QldbSession')
     @patch('pyqldb.driver.qldb_driver.client')
-    @patch('pyqldb.communication.session_client.SessionClient.start_session')
+    @patch('pyqldb.communication.session_client.SessionClient._start_session')
     def test_get_session_new_session(self, mock_start_session, mock_client, mock_qldb_session,
                                      mock_release_session, mock_bounded_semaphore, mock_atomic_integer):
         mock_start_session.return_value = mock_start_session
@@ -314,7 +314,7 @@ class TestQldbDriver(TestCase):
     @patch('pyqldb.driver.qldb_driver.BoundedSemaphore')
     @patch('pyqldb.driver.qldb_driver.QldbDriver._release_session')
     @patch('pyqldb.driver.qldb_driver.QldbSession')
-    @patch('pyqldb.communication.session_client.SessionClient.start_session')
+    @patch('pyqldb.communication.session_client.SessionClient._start_session')
     @patch('pyqldb.driver.qldb_driver.client')
     def test_get_session_existing_session(self, mock_client, mock_session_start_session, mock_qldb_session,
                                           mock_release_session, mock_bounded_semaphore, mock_atomic_integer,
@@ -395,7 +395,7 @@ class TestQldbDriver(TestCase):
 
     @patch('pyqldb.driver.qldb_driver.QldbDriver._release_session')
     @patch('pyqldb.driver.qldb_driver.QldbSession')
-    @patch('pyqldb.communication.session_client.SessionClient.start_session')
+    @patch('pyqldb.communication.session_client.SessionClient._start_session')
     @patch('pyqldb.driver.qldb_driver.client')
     def test_create_new_session(self, mock_client, mock_session_start_session, mock_qldb_session, mock_release_session):
         mock_session_start_session.return_value = mock_session_start_session
@@ -482,13 +482,13 @@ class TestQldbDriver(TestCase):
         mock_client.return_value = mock_client
         mock_lambda = Mock()
         mock_session = mock_get_session.return_value.__enter__.return_value
-        mock_session.execute_lambda.return_value = MOCK_MESSAGE
+        mock_session._execute_lambda.return_value = MOCK_MESSAGE
 
         driver = QldbDriver(MOCK_LEDGER_NAME)
         result = driver.execute_lambda(mock_lambda, mock_lambda)
 
         mock_get_session.assert_called_once_with()
-        mock_session.execute_lambda.assert_called_once_with(mock_lambda, mock_lambda)
+        mock_session._execute_lambda.assert_called_once_with(mock_lambda, mock_lambda)
         self.assertEqual(result, MOCK_MESSAGE)
 
     @patch('pyqldb.driver.qldb_driver.client')
@@ -505,7 +505,7 @@ class TestQldbDriver(TestCase):
         mock_invalid_session_error_message = {'Error': {'Code': 'InvalidSessionException',
                                                         'Message': MOCK_MESSAGE}}
         mock_invalid_session_error = ClientError(mock_invalid_session_error_message, MOCK_MESSAGE)
-        mock_session.execute_lambda.side_effect = [mock_invalid_session_error, mock_invalid_session_error, MOCK_MESSAGE]
+        mock_session._execute_lambda.side_effect = [mock_invalid_session_error, mock_invalid_session_error, MOCK_MESSAGE]
         driver = QldbDriver(MOCK_LEDGER_NAME)
 
         result = driver.execute_lambda(mock_lambda, mock_lambda)
@@ -524,7 +524,7 @@ class TestQldbDriver(TestCase):
         mock_lambda = Mock()
         mock_session = mock_get_session.return_value.__enter__.return_value
 
-        mock_session.execute_lambda.side_effect = [StartTransactionError({}), StartTransactionError({}), MOCK_MESSAGE]
+        mock_session._execute_lambda.side_effect = [StartTransactionError({}), StartTransactionError({}), MOCK_MESSAGE]
         driver = QldbDriver(MOCK_LEDGER_NAME)
 
         result = driver.execute_lambda(mock_lambda, mock_lambda)
@@ -532,13 +532,13 @@ class TestQldbDriver(TestCase):
         self.assertEqual(mock_get_session.call_count, 3)
         self.assertEqual(result, MOCK_MESSAGE)
 
-    @patch('pyqldb.session.qldb_session.QldbSession.execute_lambda')
-    @patch('pyqldb.session.qldb_session.QldbSession.execute_lambda')
+    @patch('pyqldb.session.qldb_session.QldbSession._execute_lambda')
+    @patch('pyqldb.session.qldb_session.QldbSession._execute_lambda')
     def test_return_session_with_invalid_session_exception(self, execute_lambda_1, execute_lambda_2):
         """
         The test asserts that a bad session is not returned to the pool.
-        We add two mock sessions to the pool. mock_session_1.execute_lambda returns an InvalidSessionException
-        and mock_session_2.execute_lambda succeeds.
+        We add two mock sessions to the pool. mock_session_1._execute_lambda returns an InvalidSessionException
+        and mock_session_2._execute_lambda succeeds.
         After executing driver.execute_lambda we assert if the pool has just one session which should be
         mock_session_2.
         """
@@ -557,10 +557,10 @@ class TestQldbDriver(TestCase):
                                                         'Message': MOCK_MESSAGE}}
         mock_invalid_session_error = ClientError(mock_invalid_session_error_message, MOCK_MESSAGE)
         execute_lambda_1.side_effect = mock_invalid_session_error
-        session_1.execute_lambda = execute_lambda_1
+        session_1._execute_lambda = execute_lambda_1
         session_1._is_closed = True
         execute_lambda_2.return_value = MOCK_MESSAGE
-        session_2.execute_lambda = execute_lambda_2
+        session_2._execute_lambda = execute_lambda_2
         session_2._is_closed = False
         # adding sessions to the driver pool
         driver._pool.put(session_1)
@@ -568,9 +568,9 @@ class TestQldbDriver(TestCase):
 
         result = driver.execute_lambda(mock_lambda)
 
-        self.assertEqual(session_1.execute_lambda.call_count, 1)
+        self.assertEqual(session_1._execute_lambda.call_count, 1)
         self.assertEqual(session_1._is_closed, True)
-        self.assertEqual(session_2.execute_lambda.call_count, 1)
+        self.assertEqual(session_2._execute_lambda.call_count, 1)
         self.assertEqual(session_2._is_closed, False)
         self.assertEqual(driver._pool_permits._value, 10)
         self.assertEqual(driver._pool.qsize(), 1)
@@ -578,13 +578,13 @@ class TestQldbDriver(TestCase):
 
         self.assertEqual(result, MOCK_MESSAGE)
 
-    @patch('pyqldb.session.qldb_session.QldbSession.execute_lambda')
-    @patch('pyqldb.session.qldb_session.QldbSession.execute_lambda')
+    @patch('pyqldb.session.qldb_session.QldbSession._execute_lambda')
+    @patch('pyqldb.session.qldb_session.QldbSession._execute_lambda')
     def test_return_session_with_start_transaction_error(self, execute_lambda_1, execute_lambda_2):
         """
         The test asserts that a bad session is not returned to the pool.
-        We add two mock sessions to the pool. mock_session_1.execute_lambda returns an StartTransactionError
-        and mock_session_2.execute_lambda succeeds.
+        We add two mock sessions to the pool. mock_session_1._execute_lambda returns an StartTransactionError
+        and mock_session_2._execute_lambda succeeds.
         After executing driver.execute_lambda we assert if the pool has both the sessions.
 
         """
@@ -601,20 +601,20 @@ class TestQldbDriver(TestCase):
         session_1 = QldbSession(session_1, driver._read_ahead,
                                        driver._retry_limit, driver._executor,
                                        driver._release_session)
-        session_1.execute_lambda = execute_lambda_1
+        session_1._execute_lambda = execute_lambda_1
         session_2 = QldbSession(session_2, driver._read_ahead,
                                        driver._retry_limit, driver._executor,
                                        driver._release_session)
-        session_2.execute_lambda = execute_lambda_2
+        session_2._execute_lambda = execute_lambda_2
         # adding sessions to the driver pool
         driver._pool.put(session_1)
         driver._pool.put(session_2)
 
         result = driver.execute_lambda(mock_lambda)
 
-        self.assertEqual(session_1.execute_lambda.call_count, 1)
+        self.assertEqual(session_1._execute_lambda.call_count, 1)
         self.assertEqual(session_1._is_closed, False)
-        self.assertEqual(session_2.execute_lambda.call_count, 1)
+        self.assertEqual(session_2._execute_lambda.call_count, 1)
         self.assertEqual(session_2._is_closed, False)
         self.assertEqual(driver._pool.qsize(), 2)
         self.assertEqual(driver._pool_permits._value, 10)

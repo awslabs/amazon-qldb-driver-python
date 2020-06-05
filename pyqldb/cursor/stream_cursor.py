@@ -81,7 +81,7 @@ class StreamCursor:
         """
         Get the next page using this cursor's session.
         """
-        statement_result = self._session.fetch_page(self._transaction_id, self._page.get('NextPageToken'))
+        statement_result = self._session._fetch_page(self._transaction_id, self._page.get('NextPageToken'))
         page = statement_result.get('Page')
         self._page = page
         self._index = 0

@@ -113,8 +113,8 @@ class TestStreamCursor(TestCase):
         stream_cursor = StreamCursor(MOCK_STATEMENT_RESULT, mock_session, MOCK_TRANSACTION_ID)
         stream_cursor._index = len(MOCK_ION_BINARY_VALUES)
 
-        mock_session.fetch_page.side_effect = [{'Page': {'NextPageToken': 'token', 'Values': []}},
-                                               {'Page': {'NextPageToken': None, 'Values': []}}]
+        mock_session._fetch_page.side_effect = [{'Page': {'NextPageToken': 'token', 'Values': []}},
+                                                {'Page': {'NextPageToken': None, 'Values': []}}]
         self.assertRaises(StopIteration, next, stream_cursor)
 
     @patch('pyqldb.communication.session_client.SessionClient')
@@ -137,11 +137,11 @@ class TestStreamCursor(TestCase):
     @patch('pyqldb.communication.session_client.SessionClient')
     def test_next_page(self, mock_session):
         mock_session.return_value = None
-        mock_session.fetch_page.return_value = {'Page': MOCK_STATEMENT_RESULT}
+        mock_session._fetch_page.return_value = {'Page': MOCK_STATEMENT_RESULT}
         stream_cursor = StreamCursor(MOCK_STATEMENT_RESULT, mock_session, MOCK_TRANSACTION_ID)
         stream_cursor._next_page()
 
-        mock_session.fetch_page.assert_called_once_with(stream_cursor._transaction_id, MOCK_TOKEN)
+        mock_session._fetch_page.assert_called_once_with(stream_cursor._transaction_id, MOCK_TOKEN)
         self.assertEqual(stream_cursor._page, MOCK_STATEMENT_RESULT)
         self.assertEqual(stream_cursor._index, 0)
 

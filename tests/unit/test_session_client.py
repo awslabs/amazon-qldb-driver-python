@@ -53,7 +53,7 @@ class TestSessionClient(TestCase):
         self.assertEqual(session._client, mock_client)
         self.assertEqual(session._session_id, MOCK_ID)
 
-    @patch('pyqldb.communication.session_client.SessionClient.close')
+    @patch('pyqldb.communication.session_client.SessionClient._close')
     @patch('botocore.client.BaseClient')
     def test_context_manager(self, mock_client, mock_close):
         mock_client.return_value = mock_client
@@ -96,22 +96,22 @@ class TestSessionClient(TestCase):
         mock_client.return_value = mock_client
         mock_send_command.return_value = MOCK_ABORT_TRANSACTION_RESULT
         session = SessionClient(MOCK_LEDGER_NAME, MOCK_TOKEN, mock_client, MOCK_ID)
-        result = session.abort_transaction()
+        result = session._abort_transaction()
 
         mock_send_command.assert_called_once_with({'SessionToken': MOCK_TOKEN, 'AbortTransaction': {}})
         self.assertEqual(result, MOCK_VALUES)
 
-    @patch('pyqldb.communication.session_client.SessionClient.end_session')
+    @patch('pyqldb.communication.session_client.SessionClient._end_session')
     @patch('botocore.client.BaseClient')
     def test_close(self, mock_client, mock_end_session):
         mock_client.return_value = mock_client
         session = SessionClient(MOCK_LEDGER_NAME, MOCK_TOKEN, mock_client, MOCK_ID)
-        session.close()
+        session._close()
 
         mock_end_session.assert_called_once_with()
 
     @patch('pyqldb.communication.session_client.logger.warning')
-    @patch('pyqldb.communication.session_client.SessionClient.end_session')
+    @patch('pyqldb.communication.session_client.SessionClient._end_session')
     @patch('botocore.client.BaseClient')
     def test_close_client_error(self, mock_client, mock_end_session, mock_logger_warning):
         mock_client.return_value = mock_client
@@ -119,7 +119,7 @@ class TestSessionClient(TestCase):
         ce = ClientError(MOCK_CLIENT_ERROR_MESSAGE, MOCK_ERROR_MESSAGE)
         mock_end_session.side_effect = ce
 
-        session.close()
+        session._close()
         mock_end_session.assert_called_once_with()
         mock_logger_warning.assert_called_once()
 
@@ -129,7 +129,7 @@ class TestSessionClient(TestCase):
         mock_client.return_value = mock_client
         mock_send_command.return_value = MOCK_COMMIT_TRANSACTION_RESULT
         session = SessionClient(MOCK_LEDGER_NAME, MOCK_TOKEN, mock_client, MOCK_ID)
-        result = session.commit_transaction(MOCK_TRANSACTION_ID, MOCK_COMMIT_DIGEST)
+        result = session._commit_transaction(MOCK_TRANSACTION_ID, MOCK_COMMIT_DIGEST)
 
         mock_send_command.assert_called_once_with({'SessionToken': MOCK_TOKEN, 'CommitTransaction':
                                                   {'TransactionId': MOCK_TRANSACTION_ID,
@@ -142,7 +142,7 @@ class TestSessionClient(TestCase):
         mock_client.return_value = mock_client
         mock_send_command.return_value = MOCK_END_SESSION_RESULT
         session = SessionClient(MOCK_LEDGER_NAME, MOCK_TOKEN, mock_client, MOCK_ID)
-        result = session.end_session()
+        result = session._end_session()
 
         mock_send_command.assert_called_once_with({'SessionToken': MOCK_TOKEN, 'EndSession': {}})
         self.assertEqual(result, MOCK_VALUES)
@@ -155,7 +155,7 @@ class TestSessionClient(TestCase):
         mock_send_command.return_value = MOCK_EXECUTE_STATEMENT_RESULT
         mock_to_value_holder.return_value = mock_to_value_holder
         session = SessionClient(MOCK_LEDGER_NAME, MOCK_TOKEN, mock_client, MOCK_ID)
-        result = session.execute_statement(MOCK_TRANSACTION_ID, MOCK_STATEMENT, MOCK_PARAMETERS)
+        result = session._execute_statement(MOCK_TRANSACTION_ID, MOCK_STATEMENT, MOCK_PARAMETERS)
 
         mock_send_command.assert_called_once_with({'SessionToken': MOCK_TOKEN, 'ExecuteStatement':
                                                   {'TransactionId': MOCK_TRANSACTION_ID, 'Statement': MOCK_STATEMENT,
@@ -170,7 +170,7 @@ class TestSessionClient(TestCase):
         mock_client.return_value = mock_client
         mock_send_command.return_value = MOCK_EXECUTE_STATEMENT_RESULT
         session = SessionClient(MOCK_LEDGER_NAME, MOCK_TOKEN, mock_client, MOCK_ID)
-        result = session.execute_statement(MOCK_TRANSACTION_ID, MOCK_STATEMENT, [])
+        result = session._execute_statement(MOCK_TRANSACTION_ID, MOCK_STATEMENT, [])
 
         mock_send_command.assert_called_once_with({'SessionToken': MOCK_TOKEN, 'ExecuteStatement':
                                                   {'TransactionId': MOCK_TRANSACTION_ID, 'Statement': MOCK_STATEMENT,
@@ -185,7 +185,7 @@ class TestSessionClient(TestCase):
         mock_client.return_value = mock_client
         mock_send_command.return_value = MOCK_FETCH_PAGE_RESULT
         session = SessionClient(MOCK_LEDGER_NAME, MOCK_TOKEN, mock_client, MOCK_ID)
-        result = session.fetch_page(MOCK_TRANSACTION_ID, MOCK_TOKEN)
+        result = session._fetch_page(MOCK_TRANSACTION_ID, MOCK_TOKEN)
 
         mock_send_command.assert_called_once_with({'SessionToken': MOCK_TOKEN, 'FetchPage':
                                                   {'TransactionId': MOCK_TRANSACTION_ID, 'NextPageToken': MOCK_TOKEN}})
@@ -197,7 +197,7 @@ class TestSessionClient(TestCase):
         mock_client.return_value = mock_client
         mock_send_command.return_value = MOCK_START_TRANSACTION_RESULT
         session = SessionClient(MOCK_LEDGER_NAME, MOCK_TOKEN, mock_client, MOCK_ID)
-        result = session.start_transaction().get('TransactionId')
+        result = session._start_transaction().get('TransactionId')
 
         self.assertEqual(result, MOCK_TRANSACTION_ID)
         mock_send_command.assert_called_once_with({'SessionToken': MOCK_TOKEN, 'StartTransaction': {}})
@@ -221,7 +221,7 @@ class TestSessionClient(TestCase):
     def test_start_session(self, mock_client, mock_logger_debug, mock_session_client):
         mock_client.return_value = mock_client
         mock_client.send_command.return_value = MOCK_START_SESSION_RESULT
-        result = SessionClient.start_session(MOCK_LEDGER_NAME, mock_client)
+        result = SessionClient._start_session(MOCK_LEDGER_NAME, mock_client)
 
         mock_client.send_command.assert_called_once_with(StartSession={'LedgerName': MOCK_LEDGER_NAME})
         mock_logger_debug.assert_called_once()

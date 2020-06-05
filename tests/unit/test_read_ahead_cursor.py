@@ -194,7 +194,7 @@ class TestReadAheadCursor(TestCase):
         mock_session.return_value = None
         mock_queue.return_value = mock_queue
         mock_page = {'NextPageToken': None, 'Values': []}
-        mock_session.fetch_page.return_value = {'Page': mock_page}
+        mock_session._fetch_page.return_value = {'Page': mock_page}
         mock_queue.full.return_value = False
 
         read_ahead_cursor = ReadAheadCursor(MOCK_STATEMENT_RESULT, mock_session, MOCK_TRANSACTION_ID, MOCK_READ_AHEAD,
@@ -202,7 +202,7 @@ class TestReadAheadCursor(TestCase):
         read_ahead_cursor._queue = mock_queue
 
         read_ahead_cursor._populate_queue()
-        mock_session.fetch_page.assert_called_once_with(MOCK_TRANSACTION_ID, MOCK_STATEMENT_RESULT.get('NextPageToken'))
+        mock_session._fetch_page.assert_called_once_with(MOCK_TRANSACTION_ID, MOCK_STATEMENT_RESULT.get('NextPageToken'))
         mock_queue.put.assert_called_once_with(mock_page, timeout=0.05)
 
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
@@ -211,7 +211,7 @@ class TestReadAheadCursor(TestCase):
     def test_populate_queue_client_error(self, mock_session, mock_logger_debug, mock_executor):
         mock_logger_debug.return_value = None
         mock_session.return_value = None
-        mock_session.fetch_page.side_effect = ClientError(MOCK_CLIENT_ERROR_MESSAGE, MOCK_MESSAGE)
+        mock_session._fetch_page.side_effect = ClientError(MOCK_CLIENT_ERROR_MESSAGE, MOCK_MESSAGE)
 
         read_ahead_cursor = ReadAheadCursor(MOCK_STATEMENT_RESULT, mock_session, MOCK_TRANSACTION_ID, MOCK_READ_AHEAD,
                                             mock_executor)
@@ -233,7 +233,7 @@ class TestReadAheadCursor(TestCase):
 
         mock_logger_debug.return_value = None
         mock_session.return_value = None
-        mock_session.fetch_page.side_effect = close_parent_txn
+        mock_session._fetch_page.side_effect = close_parent_txn
         read_ahead_cursor = ReadAheadCursor(MOCK_STATEMENT_RESULT, mock_session, MOCK_TRANSACTION_ID, MOCK_READ_AHEAD,
                                             mock_executor)
         read_ahead_cursor._queue = Queue(1)
@@ -248,7 +248,7 @@ class TestReadAheadCursor(TestCase):
     @patch('pyqldb.communication.session_client.SessionClient')
     def test_next_page(self, mock_session, mock_executor):
         mock_session.return_value = None
-        mock_session.fetch_page.return_value = {'Page': MOCK_STATEMENT_RESULT}
+        mock_session._fetch_page.return_value = {'Page': MOCK_STATEMENT_RESULT}
         read_ahead_cursor = ReadAheadCursor(MOCK_STATEMENT_RESULT, mock_session, MOCK_TRANSACTION_ID, MOCK_READ_AHEAD,
                                             mock_executor)
         read_ahead_cursor._queue = Queue()
@@ -262,7 +262,7 @@ class TestReadAheadCursor(TestCase):
     @patch('pyqldb.communication.session_client.SessionClient')
     def test_next_page_client_error(self, mock_session, mock_executor):
         mock_session.return_value = None
-        mock_session.fetch_page.return_value = {'Page': MOCK_STATEMENT_RESULT}
+        mock_session._fetch_page.return_value = {'Page': MOCK_STATEMENT_RESULT}
         read_ahead_cursor = ReadAheadCursor(MOCK_STATEMENT_RESULT, mock_session, MOCK_TRANSACTION_ID, MOCK_READ_AHEAD,
                                             mock_executor)
         read_ahead_cursor._queue = Queue()
