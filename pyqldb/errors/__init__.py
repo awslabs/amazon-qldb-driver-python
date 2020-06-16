@@ -47,9 +47,9 @@ class SessionPoolEmptyError(Exception):
 
 
 class StartTransactionError(Exception):
-    def __init__(self, response):
+    def __init__(self, error):
         super().__init__('Failed to start transaction')
-        self.response = response
+        self.error = error
 
 
 def is_occ_conflict_exception(e):

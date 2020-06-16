@@ -20,9 +20,9 @@ To use AmazonQLDB, you must first import the driver and specify the ledger name
 
 .. code-block:: python
 
-   from pyqldb.driver.pooled_qldb_driver import PooledQldbDriver
+   from pyqldb.driver.qldb_driver import QldbDriver
 
-   qldb_driver = PooledQldbDriver(ledger_name='vehicle-registration')
+   qldb_driver = QldbDriver(ledger_name='vehicle-registration')
 
 
 """"""""""""""""""""""
@@ -59,7 +59,7 @@ Reading Documents
         # Transaction committed implicitly on return,
         # no need to explicitly commit transaction
 
-    # pyqldb.driver.pooled_qldb_driver.PooledQldbDriver.execute_lambda accepts
+    # pyqldb.driver.qldb_driver.QldbDriver.execute_lambda accepts
     # a function that receives instance of :py:class:`pyqldb.execution.executor.Executor`
     # The passed function will be executed within the context of
     # an implicitly created transaction(and session). The transaction is wrapped by
@@ -140,11 +140,23 @@ Inserting Documents
     result in latent queries and higher number of OCC Exceptions.
 
 .. Note::
-    `execute_lambda` has an inbuilt Retry mechanism which retries the
-    transaction in case a Retryable Error occurs (such as Timeout, OCCException).
-    The number of times a transaction is configurable and can be configured by setting
-    property `retry_limit` when initializing PooledQldbDriver. The default value for
-    `retry_limit` is 4.
+    :py:meth:`pyqldb.driver.qldb_driver.QldbDriver.execute_lambda` has an inbuilt
+    Retry mechanism which retries the transaction in case a Retryable Error
+    occurs (such as Timeout, OCCException). The number of times a transaction is retried
+    is configurable. The default value for number of retries is 4. The configuration can be
+    changed by passing an instance of :py:class:`pyqldb.config.retry_config.RetryConfig` with
+    `retry_limit` property set to desirable value.
+
+
+.. code-block:: python
+
+    from pyqldb.config.retry_config import RetryConfig
+    from pyqldb.driver.qldb_driver import QldbDriver
+
+    retry_config = RetryConfig(retry_limit=2)
+    qldb_driver = QldbDriver("test-ledger", retry_config=retry_config)
+
+
 
 **For more details on Inserting Documents (eg Inserting Ion documents instead of
 native datatypes), Updating, Deleting - Check the** `Cookbook <cookbook.html#inserting-documents>`_
