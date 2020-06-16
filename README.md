@@ -32,9 +32,8 @@ Then from a Python interpreter, call the driver and specify the ledger name:
 from pyqldb.driver.qldb_driver import QldbDriver
 
 qldb_driver = QldbDriver(ledger_name='test-ledger')
-qldb_session = qldb_driver.get_session()
 
-for table in qldb_session.list_tables():
+for table in qldb_driver.list_tables():
     print(table)
 ```
 

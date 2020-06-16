@@ -16,23 +16,25 @@ from boto3 import client
 from boto3.session import Session
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from pyqldb.config.retry_config import RetryConfig
 
 from .. import __version__
 from ..communication.session_client import SessionClient
 
-from ..errors import DriverClosedError, SessionPoolEmptyError, is_invalid_session_exception, StartTransactionError
+from ..errors import DriverClosedError, SessionPoolEmptyError, is_invalid_session_exception
 from ..session.qldb_session import QldbSession
 from ..util.atomic_integer import AtomicInteger
 
-
-DEFAULT_TIMEOUT_SECONDS = 30
+POOL_TIMEOUT_SECONDS = 0.001
 logger = getLogger(__name__)
 SERVICE_DESCRIPTION = 'QLDB Driver for Python v{}'.format(__version__)
 SERVICE_NAME = 'qldb-session'
 SERVICE_RETRY = {'max_attempts': 0}
 DEFAULT_CONFIG = Config(user_agent_extra=SERVICE_DESCRIPTION, retries=SERVICE_RETRY)
+DEFAULT_RETRY_CONFIG = RetryConfig()
 
-class QldbDriver():
+
+class QldbDriver:
     """
     Creates a QldbDriver instance that can be used to execute transactions against Amazon QLDB. A single instance of
     the QldbDriver is always attached to one ledger, as specified in the ledgerName parameter.
@@ -40,9 +42,10 @@ class QldbDriver():
     :type ledger_name: str
     :param ledger_name: The QLDB ledger name.
 
-    :type retry_limit: int
-    :param retry_limit: The number of automatic retries for statement executions using convenience methods on sessions
-                        when an OCC conflict or retriable exception occurs. This value must not be negative.
+    :type retry_config: :py:class:`pyqldb.config.retry_config.RetryConfig`
+    :param retry_config: Config to specify max number of retries, base and custom backoff strategy for retries. Will be
+                         overridden if a different retry_config
+                         is passed to :py:meth:`pyqldb.driver.qldb_driver.QldbDriver.execute_lambda`.
 
     :type read_ahead: int
     :param read_ahead: The number of read-ahead buffers. Determines the maximum number of statement result pages that
@@ -76,36 +79,34 @@ class QldbDriver():
     :param boto3_session: The boto3 session to create the client with (see [1]). The boto3 session is expected to be
                           configured correctly.
 
-    :type pool_limit: int
-    :param pool_limit: The session pool limit. Set to 0 to use the maximum possible amount allowed by the client
-                       configuration. See :param config.
-
-    :type timeout: int
-    :param timeout: The timeout in seconds while attempting to retrieve a session from the session pool.
+    :type max_concurrent_transactions: int
+    :param max_concurrent_transactions: Specifies the maximum number of concurrent transactions that can be executed
+                                        by the driver. It is required that the property `max_pool_connections`
+                                        in :param config be set equal to :param max_concurrent_transactions. Set to 0 to
+                                        use the maximum possible amount allowed by the client configuration.
+                                        See :param config.
 
     :raises TypeError: When config is not an instance of :py:class:`botocore.config.Config`.
                        When boto3_session is not an instance of :py:class:`boto3.session.Session`.
+                       When retry_config is not an instance of :py:class:pyqldb.config.retry_config.RetryConfig.
 
-    :raises ValueError: When `pool_limit` exceeds the limit set by the client.
-                        When `pool_limit` or `timeout` are negative.
-                        When `read_ahead` or `retry_limit` is not set to the specified allowed values.
+    :raises ValueError: When `max_concurrent_transactions` exceeds the limit set by the client.
+                        When `max_concurrent_transactions` is negative.
+                        When `read_ahead` is not set to the specified allowed values.
 
     [1]: `Boto3 Session.client Reference <https://boto3.amazonaws.com/v1/documentation/api/latest/reference/core/session.html#boto3.session.Session.client>`_.
 
     [2]: `Botocore Config Reference <https://botocore.amazonaws.com/v1/documentation/api/latest/reference/config.html>`_.
     """
 
-    def __init__(self, ledger_name, retry_limit=4, read_ahead=0, executor=None, region_name=None, verify=None,
+    def __init__(self, ledger_name, retry_config=None, read_ahead=0, executor=None, region_name=None, verify=None,
                  endpoint_url=None, aws_access_key_id=None, aws_secret_access_key=None, aws_session_token=None,
-                 config=None, boto3_session=None, pool_limit=0, timeout=DEFAULT_TIMEOUT_SECONDS):
+                 config=None, boto3_session=None, max_concurrent_transactions=0):
 
-        if retry_limit < 0:
-            raise ValueError('Value for retry_limit cannot be negative.')
         if read_ahead < 2 and read_ahead != 0:
             raise ValueError('Value for read_ahead must be 0 or 2 or greater.')
 
         self._ledger_name = ledger_name
-        self._retry_limit = retry_limit
         self._read_ahead = read_ahead
         self._executor = executor
         self._is_closed = False
@@ -117,6 +118,14 @@ class QldbDriver():
             self._config = config.merge(DEFAULT_CONFIG)
         else:
             self._config = DEFAULT_CONFIG
+
+        if retry_config is not None:
+            if not isinstance(retry_config, RetryConfig):
+                raise TypeError('config must be of type pyqldb.config.retry_config.RetryConfig. Found: {}'
+                                .format(type(retry_config).__name__))
+            self._retry_config = retry_config
+        else:
+            self._retry_config = DEFAULT_RETRY_CONFIG
 
         if boto3_session is not None:
             if not isinstance(boto3_session, Session):
@@ -135,16 +144,11 @@ class QldbDriver():
                                   aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key,
                                   aws_session_token=aws_session_token, config=self._config)
 
-        if pool_limit < 0:
-            raise ValueError('Value for pool_limit cannot be negative.')
-        if timeout < 0:
-            raise ValueError('Value for timeout cannot be negative.')
-
         client_pool_limit = self._config.max_pool_connections
-        if pool_limit == 0:
+        if max_concurrent_transactions == 0:
             self._pool_limit = client_pool_limit
         else:
-            self._pool_limit = pool_limit
+            self._pool_limit = max_concurrent_transactions
 
         if self._pool_limit > client_pool_limit:
             raise ValueError('The session pool limit given, {}, exceeds the limit set by the client, {}. Please lower '
@@ -153,7 +157,7 @@ class QldbDriver():
         self._pool_permits = BoundedSemaphore(self._pool_limit)
         self._pool_permits_counter = AtomicInteger(self._pool_limit)
         self._pool = Queue()
-        self._timeout = timeout
+        self._timeout = POOL_TIMEOUT_SECONDS
 
     def __enter__(self):
         """
@@ -191,7 +195,7 @@ class QldbDriver():
 
         return cursor
 
-    def execute_lambda(self, query_lambda, retry_indicator=lambda execution_attempt: None):
+    def execute_lambda(self, query_lambda, retry_config=None):
         """
         Execute the lambda function against QLDB within a transaction and retrieve the result.
         This is the primary method to execute a transaction against Amazon QLDB ledger.
@@ -201,9 +205,12 @@ class QldbDriver():
                              it may be invoked multiple times, and the result cannot be trusted until the transaction is
                              committed.
 
-        :type retry_indicator: function
-        :param retry_indicator: Optional function called when the transaction execution is about to be retried due to an
-                                OCC conflict or retriable exception.
+        :type retry_config: :py:class:`pyqldb.config.retry_config.RetryConfig`
+        :param retry_config: Config to specify max number of retries, base and custom backoff strategy for retries.
+                             This config overrides the retry config set at driver level for a particular lambda
+                             execution.
+                             Note that all the values of the driver level retry config will be overwritten by the new
+                             config passed here.
 
         :rtype: :py:class:`pyqldb.cursor.buffered_cursor.BufferedCursor`/object
         :return: The return value of the lambda function which could be a
@@ -218,12 +225,13 @@ class QldbDriver():
 
         :raises LambdaAbortedError: If the lambda function calls :py:class:`pyqldb.execution.executor.Executor.abort`.
         """
+
+        retry_config = self._retry_config if retry_config is None else retry_config
+        context = _LambdaExecutionContext()
         while True:
             try:
                 with self._get_session() as session:
-                    return session._execute_lambda(query_lambda, retry_indicator)
-            except StartTransactionError:
-                pass
+                    return session._execute_lambda(query_lambda, retry_config, context)
             except ClientError as ce:
                 if is_invalid_session_exception(ce):
                     pass
@@ -253,8 +261,7 @@ class QldbDriver():
         Create a new QldbSession object.
         """
         session_client = SessionClient._start_session(self._ledger_name, self._client)
-        return QldbSession(session_client, self._read_ahead, self._retry_limit, self._executor,
-                           self._release_session)
+        return QldbSession(session_client, self._read_ahead, self._executor, self._release_session)
 
     def _release_session(self, session):
         """
@@ -305,3 +312,20 @@ class QldbDriver():
                 raise e
         else:
             raise SessionPoolEmptyError(self._timeout)
+
+
+class _LambdaExecutionContext:
+    """
+    The class is used for storing execution context across a lifespan of a lambda (including
+    retries due to session expiry).
+    The class is purely meant for internal use.
+    """
+    def __init__(self):
+        self._execution_attempt = 0
+
+    def increment_execution_attempt(self):
+        self._execution_attempt += 1
+
+    @property
+    def execution_attempt(self):
+        return self._execution_attempt

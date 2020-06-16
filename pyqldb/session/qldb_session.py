@@ -10,10 +10,11 @@
 # and limitations under the License.
 from logging import getLogger
 from time import sleep
-import random
 
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, EndpointConnectionError, ConnectionClosedError, ConnectTimeoutError, \
+    ReadTimeoutError
 
+from pyqldb.util.retry import Retry
 from ..errors import is_bad_request_exception, is_invalid_session_exception, is_occ_conflict_exception, \
     is_retriable_exception, SessionClosedError, LambdaAbortedError, StartTransactionError
 from ..cursor.buffered_cursor import BufferedCursor
@@ -25,8 +26,12 @@ logger = getLogger(__name__)
 SLEEP_CAP_MS = 5000
 SLEEP_BASE_MS = 10
 
+RETRYABLE_HTTP_ERRORS = (
+    ReadTimeoutError, EndpointConnectionError, ConnectionClosedError, ConnectTimeoutError
+)
 
-class QldbSession():
+
+class QldbSession:
     """
     The QldbSession is meant for internal use only.
     A class representing a session to a QLDB ledger for interacting with QLDB. A QldbSession is linked to the specified
@@ -41,15 +46,12 @@ class QldbSession():
     See :py:class:`pyqldb.driver.qldb_driver.QldbDriver` for an example of session lifecycle management,
     allowing the re-use of sessions when possible. There should only be one thread interacting with a session at any
     given time.
-    
+
     :type session: :py:class:`pyqldb.communication.session_client.SessionClient`
     :param session: The session object representing a communication channel with QLDB.
 
     :type read_ahead: int
     :param read_ahead: The number of pages to read-ahead and buffer when retrieving results.
-
-    :type retry_limit: int
-    :param retry_limit: The limit for retries on execute methods when an OCC conflict or retriable exception occurs.
 
     :type executor: :py:class:`concurrent.futures.thread.ThreadPoolExecutor`
     :param executor: The executor to be used by the retrieval thread.
@@ -58,10 +60,9 @@ class QldbSession():
     :param return_session_to_pool: A callback that describes how the session will be returned to the pool.
     """
 
-    def __init__(self, session, read_ahead, retry_limit, executor, return_session_to_pool):
+    def __init__(self, session, read_ahead, executor, return_session_to_pool):
         self._is_closed = False
         self._read_ahead = read_ahead
-        self._retry_limit = retry_limit
         self._executor = executor
         self._session = session
         self._return_session_to_pool = return_session_to_pool
@@ -113,24 +114,22 @@ class QldbSession():
             self._is_closed = True
             self._session._close()
 
-    def _execute_lambda(self, query_lambda, retry_indicator=lambda execution_attempt: None):
+    def _execute_lambda(self, query_lambda, retry_config, context):
         """
         Implicitly start a transaction, execute the lambda function, and commit the transaction, retrying up to the
         retry limit if an OCC conflict or retriable exception occurs.
-
-        If an InvalidSessionException is received, it is considered a retriable exception by starting a new
-        :py:class:`pyqldb.communication.session_client.SessionClient` to use to communicate with QLDB. Thus, as a side
-        effect, this QldbSession can become valid again despite a previous InvalidSessionException from other method
-        calls on this instance, any child transactions, or cursors, when this method is invoked.
 
         :type query_lambda: function
         :param query_lambda: The lambda function to execute. A lambda function cannot have any side effects as
                              it may be invoked multiple times, and the result cannot be trusted until the transaction is
                              committed.
 
-        :type retry_indicator: function
-        :param retry_indicator: Optional function called when the transaction execution is about to be retried due to an
-                                OCC conflict or retriable exception.
+        :type retry_config: :py:class:`pyqldb.config.retry_config.RetryConfig`
+        :param retry_config: Config to specify max number of retries, base and custom backoff strategy for retries.
+
+        :type context: :py:class:`pyqldb.driver.qldb_driver._LambdaExecutionContext`
+        :param context: The LambdaExecutionContext instance is used for storing execution context across a lifespan of
+        a lambda (including retries due to session expiry).
 
         :rtype: :py:class:`pyqldb.cursor.buffered_cursor.BufferedCursor`/object
         :return: The return value of the lambda function which could be a
@@ -144,9 +143,9 @@ class QldbSession():
         :raises LambdaAbortedError: If the lambda function calls :py:class:`pyqldb.execution.executor.Executor.abort`.
         """
 
-        execution_attempt = 0
         while True:
             transaction = None
+            error = None
             try:
                 transaction = self._start_transaction()
                 result = query_lambda(Executor(transaction))
@@ -156,24 +155,37 @@ class QldbSession():
                     result = BufferedCursor(result)
                 transaction._commit()
                 return result
-            except (LambdaAbortedError, StartTransactionError) as e:
+            except LambdaAbortedError as lae:
                 self._no_throw_abort(transaction)
-                raise e
+                raise lae
+            except StartTransactionError as ste:
+                error = ste.error
+                self._no_throw_abort(transaction)
+                if context.execution_attempt >= retry_config.retry_limit:
+                    # raise wrapped Error
+                    raise ste.error
+            except RETRYABLE_HTTP_ERRORS as rhe:
+                error = rhe
+                self._no_throw_abort(transaction)
+                if context.execution_attempt >= retry_config.retry_limit:
+                    raise rhe
+                logger.warning('Retryable HTTP error occurred: {}, retrying transaction'.format(rhe))
             except ClientError as ce:
+                error = ce
                 if is_invalid_session_exception(ce):
                     self._is_closed = True
                     raise ce
                 self._no_throw_abort(transaction)
                 if is_occ_conflict_exception(ce) or is_retriable_exception(ce):
-                    logger.warning('OCC conflict or retriable exception occurred: {}'.format(ce))
-                    if execution_attempt >= self._retry_limit:
+                    if context.execution_attempt >= retry_config.retry_limit:
                         raise ce
+                    logger.warning('OCC conflict or retriable exception occurred: {}'.format(ce))
                 else:
                     raise ce
 
-            execution_attempt += 1
-            retry_indicator(execution_attempt)
-            self._retry_sleep(execution_attempt)
+            context.increment_execution_attempt()
+            transaction_id = None if transaction is None else transaction.transaction_id
+            self._retry_sleep(retry_config, context.execution_attempt, error, transaction_id)
 
     def _start_transaction(self):
         """
@@ -190,7 +202,8 @@ class QldbSession():
             return transaction
         except ClientError as ce:
             if is_bad_request_exception(ce):
-                raise StartTransactionError(ce.response)
+                logger.warning('Error occurred while starting transaction: {}'.format(ce))
+                raise StartTransactionError(ce)
             raise ce
 
     def _throw_if_closed(self):
@@ -202,13 +215,9 @@ class QldbSession():
             raise SessionClosedError
 
     @staticmethod
-    def _retry_sleep(attempt_number):
-        """
-        Sleeps an exponentially increasing amount relative to `attempt_number`.
-        """
-        jitter_rand = random.random()
-        exponential_back_off = min(SLEEP_CAP_MS, pow(SLEEP_BASE_MS, attempt_number))
-        sleep((jitter_rand * (exponential_back_off + 1)) / 1000)
+    def _retry_sleep(retry_config, execution_attempt, error, transaction_id):
+
+        sleep(Retry.calculate_backoff(retry_config, execution_attempt, error, transaction_id) / 1000)
 
     def _no_throw_abort(self, transaction):
         """

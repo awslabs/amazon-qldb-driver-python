@@ -32,6 +32,11 @@ class TestStatementExecution(TestCase):
 
         cls.qldb_driver = cls.integration_test_base.qldb_driver()
 
+        def custom_backoff(retry_attempt, error, txn_id):
+            return 0
+
+        cls.qldb_driver_with_custom_backoff = cls.integration_test_base.qldb_driver(custom_backoff=custom_backoff)
+
         # Create table.
         cls.qldb_driver.execute_lambda(lambda txn:
                                        txn.execute_statement("CREATE TABLE {}".format(TABLE_NAME)))
@@ -86,6 +91,18 @@ class TestStatementExecution(TestCase):
     def test_list_tables(self):
         # When.
         cursor = self.qldb_driver.list_tables()
+
+        # Then.
+        tables = list()
+        for row in cursor:
+            tables.append(row)
+
+        self.assertTrue(TABLE_NAME in tables)
+        self.assertTrue(len(tables) == 1)
+
+    def test_list_tables_custom_backoff(self):
+        # When.
+        cursor = self.qldb_driver_with_custom_backoff.list_tables()
 
         # Then.
         tables = list()

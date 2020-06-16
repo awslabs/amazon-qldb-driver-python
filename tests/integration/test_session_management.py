@@ -63,7 +63,12 @@ class TestSessionManagement(TestCase):
 
         # With the time out set to 1 ms, only one thread should go through.
         # The other thread will try to acquire the session, but because it can wait for only 1ms, it will error out.
-        with self.integration_test_base.qldb_driver(pool_limit=1, time_out=0.001) as qldb_driver:
+        with self.integration_test_base.qldb_driver(max_concurrent_transactions=1) as qldb_driver:
+
+            # Overriding pool timeout to 0.001s
+            # Note that this override is purely for testing purpose and is NOT RECOMMENDED for production applications.
+            qldb_driver._timeout = 0.001
+
             thread_1 = ThreadThatSavesException(target=qldb_driver.list_tables, bucket=bucket)
             thread_2 = ThreadThatSavesException(target=qldb_driver.list_tables, bucket=bucket)
 
@@ -81,9 +86,14 @@ class TestSessionManagement(TestCase):
         bucket = Queue()
 
         # Start a pooled driver with pool limit of 1 and default timeout of 30 seconds.
-        with self.integration_test_base.qldb_driver(pool_limit=1, time_out=30) as qldb_driver:
+        with self.integration_test_base.qldb_driver(max_concurrent_transactions=1) as qldb_driver:
             # Start two threads to execute list_tables() concurrently which will hit the session pool limit but
             # will succeed because session is returned to pool before timing out.
+
+            # Overriding pool timeout to 30s
+            # Note that this override is purely for testing purpose and is NOT RECOMMENDED for production applications.
+            qldb_driver._timeout = 30
+
             thread_1 = ThreadThatSavesException(target=qldb_driver.list_tables, bucket=bucket)
             thread_2 = ThreadThatSavesException(target=qldb_driver.list_tables, bucket=bucket)
 
