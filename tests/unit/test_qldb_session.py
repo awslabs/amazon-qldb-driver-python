@@ -59,6 +59,24 @@ class TestQldbSession(TestCase):
     @patch('concurrent.futures.thread.ThreadPoolExecutor')
     @patch('pyqldb.communication.session_client.SessionClient')
     def test_context_manager_with_start_transaction_error(self, mock_session, mock_executor, mock_release):
+        mock_bad_request_error_message = {'Error': {'Code': 'BadRequestException',
+                                                        'Message': MOCK_MESSAGE}}
+        mock_invalid_session_error = ClientError(mock_bad_request_error_message, MOCK_MESSAGE)
+
+        mock_session.ledger_name = MOCK_LEDGER_NAME
+        mock_session._start_transaction.side_effect = mock_invalid_session_error
+
+        with self.assertRaises(StartTransactionError):
+            with QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor,
+                             MOCK_DRIVER_RELEASE) as qldb_session:
+                qldb_session._start_transaction()
+        mock_release.assert_called_once_with()
+
+    @patch('pyqldb.session.qldb_session.QldbSession._release')
+    @patch('concurrent.futures.thread.ThreadPoolExecutor')
+    @patch('pyqldb.communication.session_client.SessionClient')
+    def test_context_manager_with_start_transaction_error_invalid_session(self,
+                                                                          mock_session, mock_executor, mock_release):
         mock_invalid_session_error_message = {'Error': {'Code': 'InvalidSessionException',
                                                         'Message': MOCK_MESSAGE}}
         mock_invalid_session_error = ClientError(mock_invalid_session_error_message, MOCK_MESSAGE)
@@ -66,7 +84,7 @@ class TestQldbSession(TestCase):
         mock_session.ledger_name = MOCK_LEDGER_NAME
         mock_session._start_transaction.side_effect = mock_invalid_session_error
 
-        with self.assertRaises(StartTransactionError):
+        with self.assertRaises(ClientError):
             with QldbSession(mock_session, MOCK_READ_AHEAD, MOCK_RETRY_LIMIT, mock_executor,
                              MOCK_DRIVER_RELEASE) as qldb_session:
                 qldb_session._start_transaction()

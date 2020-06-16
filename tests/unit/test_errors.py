@@ -11,10 +11,21 @@
 from unittest import TestCase
 from unittest.mock import patch
 
-from pyqldb.errors import is_occ_conflict_exception, is_invalid_session_exception, is_retriable_exception
+from pyqldb.errors import is_occ_conflict_exception, is_invalid_session_exception, is_retriable_exception, \
+    is_bad_request_exception
 
 
 class TestErrors(TestCase):
+
+    @patch('botocore.exceptions.ClientError')
+    def test_is_bad_request_exception_true(self, mock_client_error):
+        mock_client_error.response = {'Error': {'Code': 'BadRequestException'}}
+        self.assertTrue(is_bad_request_exception(mock_client_error))
+
+    @patch('botocore.exceptions.ClientError')
+    def test_is_bad_request_exception_false(self, mock_client_error):
+        mock_client_error.response = {'Error': {'Code': 'NotBadRequestException'}}
+        self.assertFalse(is_bad_request_exception(mock_client_error))
 
     @patch('botocore.exceptions.ClientError')
     def test_is_occ_conflict_exception_true(self, mock_client_error):
