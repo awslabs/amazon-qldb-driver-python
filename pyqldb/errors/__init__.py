@@ -66,6 +66,20 @@ def is_occ_conflict_exception(e):
     return is_occ
 
 
+def is_bad_request_exception(e):
+    """
+    Is the exception a BadRequestException?
+
+    :type e: :py:class:`botocore.exceptions.ClientError`
+    :param e: The ClientError caught.
+
+    :rtype: bool
+    :return: True if the exception is an BadRequestException. False otherwise.
+    """
+    is_bad_request = e.response['Error']['Code'] == "BadRequestException"
+    return is_bad_request
+
+
 def is_invalid_session_exception(e):
     """
     Is the exception an InvalidSessionException?

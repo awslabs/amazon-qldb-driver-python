@@ -14,8 +14,8 @@ import random
 
 from botocore.exceptions import ClientError
 
-from ..errors import is_invalid_session_exception, is_occ_conflict_exception, is_retriable_exception, \
-    SessionClosedError, LambdaAbortedError, StartTransactionError
+from ..errors import is_bad_request_exception, is_invalid_session_exception, is_occ_conflict_exception, \
+    is_retriable_exception, SessionClosedError, LambdaAbortedError, StartTransactionError
 from ..cursor.buffered_cursor import BufferedCursor
 from ..cursor.stream_cursor import StreamCursor
 from ..execution.executor import Executor
@@ -188,8 +188,10 @@ class QldbSession():
             transaction_id = self._session._start_transaction().get('TransactionId')
             transaction = Transaction(self._session, self._read_ahead, transaction_id, self._executor)
             return transaction
-        except ClientError as e:
-            raise StartTransactionError(e.response)
+        except ClientError as ce:
+            if is_bad_request_exception(ce):
+                raise StartTransactionError(ce.response)
+            raise ce
 
     def _throw_if_closed(self):
         """
