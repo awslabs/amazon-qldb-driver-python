@@ -34,5 +34,13 @@ setuptools.setup(
     author='Amazon Web Services',
     packages=setuptools.find_packages(),
     install_requires=requires,
-    license="Apache License 2.0"
+    license="Apache License 2.0",
+    classifiers = [
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: Apache Software License",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8"
+    ]
 )

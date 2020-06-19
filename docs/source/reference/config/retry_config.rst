@@ -24,5 +24,5 @@ Usage
     def custom_backoff(retry_attempt, error, transaction_id):
         return 1000 * retry_attempt
 
-    retry_config = RetryConfig(retry_limit=2, custom_backoff=custom_backoff)
-    qldb_driver = QldbDriver("test-ledger", retry_config=retry_config)
+    retry_config_custom_backoff = RetryConfig(retry_limit=2, custom_backoff=custom_backoff)
+    qldb_driver = QldbDriver("test-ledger", retry_config=retry_config_custom_backoff)

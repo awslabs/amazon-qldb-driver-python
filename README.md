@@ -3,6 +3,7 @@
 This is the Python driver for [Amazon Quantum Ledger Database (QLDB)](https://aws.amazon.com/qldb/), which allows Python developers
 to write software that makes use of AmazonQLDB.
 
+[![Latest Version](https://img.shields.io/pypi/v/pyqldb.svg)](https://pypi.python.org/pypi/pyqldb)
 [![Documentation Status](https://readthedocs.org/projects/amazon-qldb-driver-python/badge/?version=latest)](https://amazon-qldb-driver-python.readthedocs.io/en/latest/?badge=latest)
 
 For our tutorial, see [Python and Amazon QLDB](https://docs.aws.amazon.com/qldb/latest/developerguide/getting-started.python.html).
@@ -13,9 +14,13 @@ For our tutorial, see [Python and Amazon QLDB](https://docs.aws.amazon.com/qldb/
 
 See [Accessing Amazon QLDB](https://docs.aws.amazon.com/qldb/latest/developerguide/accessing.html) for information on connecting to AWS.
 
-### Python 3.4 or later
+### Required Python versions
 
-The driver requires Python 3.4 or later. Please see the link below for more detail to install Python:
+Pyqldb 2.x requires Python 3.4 or later.
+
+Pyqldb 3.x requires Python 3.6 or later. 
+
+Please see the link below for more detail to install Python:
 
 * [Python Installation](https://www.python.org/downloads/)
 
@@ -39,8 +44,8 @@ for table in qldb_driver.list_tables():
 
 ### See Also
 
-1. [Getting Started with Amazon QLDB Python Driver](https://amazon-qldb-driver-python.readthedocs.io/en/v2.0.2/guide/getting_started.html) A guide that gets you started with executing transactions with the QLDB Python driver.
-2. [QLDB Python Driver Cookbook](https://amazon-qldb-driver-python.readthedocs.io/en/v2.0.2/guide/cookbook.html) The cookbook provides code samples for some simple QLDB Python driver use cases. 
+1. [Getting Started with Amazon QLDB Python Driver](https://amazon-qldb-driver-python.readthedocs.io/en/stable/guide/getting_started.html) A guide that gets you started with executing transactions with the QLDB Python driver.
+2. [QLDB Python Driver Cookbook](https://amazon-qldb-driver-python.readthedocs.io/en/stable/guide/cookbook.html) The cookbook provides code samples for some simple QLDB Python driver use cases. 
 3. [Amazon QLDB Python Driver Tutorial](https://docs.aws.amazon.com/qldb/latest/developerguide/getting-started.python.tutorial.html): In this tutorial, you use the QLDB Driver for Python to create an Amazon QLDB ledger and populate it with tables and sample data.
 4. [Amazon QLDB Python Driver Samples](https://github.com/aws-samples/amazon-qldb-dmv-sample-python): A DMV based example application which demonstrates how to use QLDB with the QLDB Driver for Python.
 5. QLDB Python driver accepts and returns [Amazon ION](http://amzn.github.io/ion-docs/) Documents. Amazon Ion is a richly-typed, self-describing, hierarchical data serialization format offering interchangeable binary and text representations. For more information read the [ION docs](https://readthedocs.org/projects/ion-python/).
@@ -69,7 +74,7 @@ $ pip install -e .
 You can run the unit tests with this command:
 
 ```
-$ pytest --cov-report term-missing --cov=pyqldb
+$ pytest --cov-report term-missing --cov=pyqldb tests/unit
 ```
 
 You can run the integration tests with this command:
