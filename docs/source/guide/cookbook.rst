@@ -21,7 +21,7 @@ Creating ION types
 
     .. code-block:: python
 
-        ion_text = '{GovId: 'TOYENC486FH', FirstName: "Brent"}'
+        ion_text = '{GovId: "TOYENC486FH", FirstName: "Brent"}'
         ion_obj = simpleion.loads(ion_text)
 
         print(ion_obj['GovId']) #prints TOYENC486FH
@@ -407,3 +407,50 @@ If a competing transaction concurrently passes the assertion, only one of the tr
 .. Note::
     In the above example, it is  recommended to have **index** on the field `GovId` for performance reasons.
     A missing index on `GovId` may result in latent queries and higher number of OCC Exceptions.
+
+Implementing Custom Retry/Backoff
+---------------------------------
+
+The Driver supports specifying custom Retries and Backoffs
+
+.. code-block:: python
+
+
+    from pyqldb.config.retry_config import RetryConfig
+    from pyqldb.driver.qldb_driver import QldbDriver
+
+    # Configuring Retry limit to 2
+    retry_config = RetryConfig(retry_limit=2)
+    qldb_driver = QldbDriver("test-ledger", retry_config=retry_config)
+
+    # Configuring a custom back off which increases delay by 1s for each attempt.
+
+    def custom_backoff(retry_attempt, error, transaction_id):
+        return 1000 * retry_attempt
+
+    retry_config_custom_backoff = RetryConfig(retry_limit=2, custom_backoff=custom_backoff)
+    qldb_driver = QldbDriver("test-ledger", retry_config=retry_config_custom_backoff)
+
+A custom Retry/Backoff config can also be specified for a particular lambda execution.
+Note: Passing a config to :py:meth:`pyqldb.driver.qldb_driver.QldbDriver.execute_lambda` will override
+the config specified for `QldbDriver`.
+
+.. code-block:: python
+
+
+    from pyqldb.config.retry_config import RetryConfig
+    from pyqldb.driver.qldb_driver import QldbDriver
+
+    # Configuring Retry limit to 2
+    retry_config_1 = RetryConfig(retry_limit=4)
+    qldb_driver = QldbDriver("test-ledger", retry_config=retry_config_1)
+
+    # Configuring a custom back off which increases delay by 1s for each attempt.
+
+    def custom_backoff(retry_attempt, error, transaction_id):
+        return 1000 * retry_attempt
+
+    retry_config_2 = RetryConfig(retry_limit=2, custom_backoff=custom_backoff)
+
+    # The config `retry_config_1` will be overriden by `retry_config_2`
+    qldb_driver.execute_lambda(lambda txn: txn.execute_statement("CREATE TABLE Person"), retry_config_2)

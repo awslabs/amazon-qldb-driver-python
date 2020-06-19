@@ -1,5 +1,36 @@
-### Release 2.0.2 (May 7, 2020)
-* Added `Getting Started` and `Cookbook` to public api docs.
+### [Release 3.0.0-rc.1](https://github.com/awslabs/amazon-qldb-driver-python/releases/tag/v3.0.0-rc.1) (June 22, 2020)
+Note this version is a release candidate and may not be production ready.
+
+#### Breaking changes:
+
+* [(#23)](https://github.com/awslabs/amazon-qldb-driver-python/issues/23) Moved Session pooling functionality to 
+`QldbDriver` and removed `PooledQldbDriver`.
+* [(#28)](https://github.com/awslabs/amazon-qldb-driver-python/issues/28) Removed interfaces which allow developers to 
+get a session from the pool and execute transaction.
+* [(#29)](https://github.com/awslabs/amazon-qldb-driver-python/issues/29) Renamed `QldbDriver` property `pool_limit` to 
+`max_concurrent_transactions`.
+* [(#30)](https://github.com/awslabs/amazon-qldb-driver-python/issues/30) Removed `QldbDriver` property `pool_timeout`.
+* [(#31)](https://github.com/awslabs/amazon-qldb-driver-python/issues/31) Moved method `list_tables` to the driver 
+instance
+* [(#27)](https://github.com/awslabs/amazon-qldb-driver-python/issues/27) Removed `retry_indicator` 
+from `QldbDriver.execute_lambda`.
+* [(#27)](https://github.com/awslabs/amazon-qldb-driver-python/issues/27) Moved `retry_limit` from `QldbDriver` to 
+`RetryConfig`.
+ [(#34)](https://github.com/awslabs/amazon-qldb-driver-python/issues/34)  Removed `QldbDriver.execute_statement`.
+
+#### New features:
+
+* [(#27)](https://github.com/awslabs/amazon-qldb-driver-python/issues/27) Added support for defining custom retry 
+backoffs.
+
+#### Announcements 
+
+* Dropping support for Python v3.4 and v3.5. Going forward the minimum Python version required will be v3.6 for Pyqldb 3.x 
+series.
+
+
+### Release 2.0.2 (May 4, 2020)
+* Added `Getting Started` and `Cookbook` to public API docs.
 
 ### Release 2.0.1 (March 18, 2020)
 
