@@ -9,6 +9,8 @@
 # CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
 # and limitations under the License.
 
+import re
+
 
 class IllegalStateError(Exception):
     pass
@@ -92,6 +94,24 @@ def is_invalid_session_exception(e):
     """
     is_invalid_session = e.response['Error']['Code'] == 'InvalidSessionException'
     return is_invalid_session
+
+
+def is_transaction_expired_exception(e):
+    """
+    Does this exception denote that a transaction has expired?
+
+    :type e: :py:class:`botocore.exceptions.ClientError`
+    :param e: The ClientError caught.
+
+    :rtype: bool
+    :return: True if the exception denote that a transaction has expired. False otherwise.
+    """
+    is_invalid_session = e.response['Error']['Code'] == 'InvalidSessionException'
+
+    if "Message" in e.response["Error"]:
+        return is_invalid_session and re.search("Transaction .* has expired", e.response["Error"]["Message"])
+
+    return False
 
 
 def is_retriable_exception(e):

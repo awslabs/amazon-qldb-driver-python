@@ -21,7 +21,8 @@ from pyqldb.config.retry_config import RetryConfig
 from .. import __version__
 from ..communication.session_client import SessionClient
 
-from ..errors import DriverClosedError, SessionPoolEmptyError, is_invalid_session_exception
+from ..errors import DriverClosedError, SessionPoolEmptyError, is_invalid_session_exception, \
+    is_transaction_expired_exception
 from ..session.qldb_session import QldbSession
 from ..util.atomic_integer import AtomicInteger
 
@@ -233,6 +234,8 @@ class QldbDriver:
                 with self._get_session() as session:
                     return session._execute_lambda(query_lambda, retry_config, context)
             except ClientError as ce:
+                if is_transaction_expired_exception(ce):
+                    raise ce
                 if is_invalid_session_exception(ce):
                     pass
                 else:

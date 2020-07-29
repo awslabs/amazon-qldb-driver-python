@@ -12,7 +12,7 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from pyqldb.errors import is_occ_conflict_exception, is_invalid_session_exception, is_retriable_exception, \
-    is_bad_request_exception
+    is_bad_request_exception, is_transaction_expired_exception
 
 
 class TestErrors(TestCase):
@@ -26,6 +26,19 @@ class TestErrors(TestCase):
     def test_is_bad_request_exception_false(self, mock_client_error):
         mock_client_error.response = {'Error': {'Code': 'NotBadRequestException'}}
         self.assertFalse(is_bad_request_exception(mock_client_error))
+
+
+    @patch('botocore.exceptions.ClientError')
+    def test_is_transaction_expired_exception(self, mock_client_error):
+        mock_client_error.response = {'Error': {'Code': 'InvalidSessionException',
+                                                'Message': 'Transaction xyz has expired'}}
+        self.assertTrue(is_transaction_expired_exception(mock_client_error))
+
+    @patch('botocore.exceptions.ClientError')
+    def test_is_bad_request_exception_false(self, mock_client_error):
+        mock_client_error.response = {'Error': {'Code': 'InvalidSessionException',
+                                                'Message': 'Transaction xyz has not expired'}}
+        self.assertFalse(is_transaction_expired_exception(mock_client_error))
 
     @patch('botocore.exceptions.ClientError')
     def test_is_occ_conflict_exception_true(self, mock_client_error):

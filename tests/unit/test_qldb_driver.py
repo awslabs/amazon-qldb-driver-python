@@ -477,6 +477,26 @@ class TestQldbDriver(TestCase):
         self.assertEqual(mock_get_session.call_count, 3)
         self.assertEqual(result, MOCK_MESSAGE)
 
+    @patch('pyqldb.driver.qldb_driver.client')
+    @patch('pyqldb.driver.qldb_driver.QldbDriver._get_session')
+    def test_execute_lambda_when_transaction_expires(self, mock_get_session, mock_client):
+        """
+        The test asserts that if the transaction in flight expires an ISE is thrown by session.execute_lambda.
+        """
+        mock_client.return_value = mock_client
+        mock_lambda = Mock()
+        mock_session = mock_get_session.return_value.__enter__.return_value
+        transaction_expired_message = "Transaction xyz has expired"
+
+        mock_invalid_session_error_message = {'Error': {'Code': 'InvalidSessionException',
+                                                        'Message': transaction_expired_message}}
+        mock_invalid_session_error = ClientError(mock_invalid_session_error_message, MOCK_MESSAGE)
+        mock_session._execute_lambda.side_effect = [mock_invalid_session_error]
+        driver = QldbDriver(MOCK_LEDGER_NAME)
+
+        self.assertRaises(ClientError, driver.execute_lambda, mock_lambda, mock_lambda)
+        self.assertEqual(mock_get_session.call_count, 1)
+
     @patch('pyqldb.driver.qldb_driver._LambdaExecutionContext.increment_execution_attempt')
     @patch('pyqldb.session.qldb_session.QldbSession._execute_lambda')
     @patch('pyqldb.session.qldb_session.QldbSession._execute_lambda')
