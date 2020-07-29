@@ -175,13 +175,17 @@ class QldbSession:
                 if is_invalid_session_exception(ce):
                     self._is_closed = True
                     raise ce
-                self._no_throw_abort(transaction)
+                if not is_occ_conflict_exception(ce):
+                    self._no_throw_abort(transaction)
                 if is_occ_conflict_exception(ce) or is_retriable_exception(ce):
                     if context.execution_attempt >= retry_config.retry_limit:
                         raise ce
                     logger.warning('OCC conflict or retriable exception occurred: {}'.format(ce))
                 else:
                     raise ce
+            except Exception as e:
+                self._no_throw_abort(transaction)
+                raise e
 
             context.increment_execution_attempt()
             transaction_id = None if transaction is None else transaction.transaction_id

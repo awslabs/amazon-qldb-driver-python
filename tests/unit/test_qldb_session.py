@@ -261,11 +261,37 @@ class TestQldbSession(TestCase):
                           MOCK_DEFAULT_RETRY_CONFIG, lambda_execution_context)
 
         mock_start_transaction.assert_has_calls([call(), call(), call(), call(), call()])
-        mock_no_throw_abort.assert_has_calls([call(mock_transaction), call(mock_transaction), call(mock_transaction),
-                                              call(mock_transaction), call(mock_transaction)])
+        self.assertEqual(mock_no_throw_abort.call_count, 0)
         mock_is_occ_conflict_exception.assert_has_calls([call(ce), call(ce), call(ce), call(ce), call(ce)])
         self.assertEqual(mock_lambda.call_count, MOCK_DEFAULT_RETRY_CONFIG.retry_limit + 1)
         self.assertEqual(mock_logger_warning.call_count, MOCK_DEFAULT_RETRY_CONFIG.retry_limit)
+        mock_transaction._commit.assert_not_called()
+
+    @patch('pyqldb.session.qldb_session.QldbSession._no_throw_abort')
+    @patch('concurrent.futures.thread.ThreadPoolExecutor')
+    @patch('pyqldb.session.qldb_session.is_retriable_exception')
+    @patch('pyqldb.session.qldb_session.is_occ_conflict_exception')
+    @patch('pyqldb.session.qldb_session.Transaction')
+    @patch('pyqldb.communication.session_client.SessionClient')
+    @patch('pyqldb.session.qldb_session.QldbSession._start_transaction')
+    def test_execute_lambda_unknow_exception(self, mock_start_transaction, mock_session, mock_transaction,
+                                             mock_is_occ_conflict_exception, mock_is_retriable_exception,
+                                             mock_executor, mock_no_throw_abort):
+        error = KeyError()
+        mock_start_transaction.return_value = mock_transaction
+        mock_is_occ_conflict_exception.return_value = True
+        mock_is_retriable_exception.return_value = False
+        qldb_session = QldbSession(mock_session, MOCK_READ_AHEAD,
+                                   mock_executor, MOCK_DRIVER_RELEASE)
+        lambda_execution_context = _LambdaExecutionContext()
+        mock_lambda = Mock()
+        mock_lambda.side_effect = error
+        self.assertRaises(KeyError, qldb_session._execute_lambda, mock_lambda,
+                          MOCK_DEFAULT_RETRY_CONFIG, lambda_execution_context)
+
+        self.assertEqual(mock_start_transaction.call_count, 1)
+        self.assertEqual(mock_no_throw_abort.call_count, 1)
+        self.assertEqual(mock_lambda.call_count, 1)
         mock_transaction._commit.assert_not_called()
 
     @patch('pyqldb.session.qldb_session.QldbSession._no_throw_abort')
@@ -385,8 +411,6 @@ class TestQldbSession(TestCase):
                           MOCK_DEFAULT_RETRY_CONFIG, mock_lambda_execution_context)
 
         mock_start_transaction.assert_has_calls([call(), call(), call(), call(), call()])
-        mock_no_throw_abort.assert_has_calls([call(mock_transaction), call(mock_transaction), call(mock_transaction),
-                                              call(mock_transaction), call(mock_transaction)])
         mock_is_occ_conflict.assert_has_calls([call(ce), call(ce), call(ce), call(ce), call(ce)])
         self.assertEqual(mock_lambda.call_count, MOCK_DEFAULT_RETRY_CONFIG.retry_limit + 1)
         self.assertEqual(mock_logger_warning.call_count, MOCK_DEFAULT_RETRY_CONFIG.retry_limit)

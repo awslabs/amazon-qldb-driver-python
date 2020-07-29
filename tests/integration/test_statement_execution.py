@@ -8,6 +8,8 @@
 # or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
 # CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
 # and limitations under the License.
+from time import sleep
+
 import pytest
 from unittest import TestCase
 
@@ -554,6 +556,14 @@ class TestStatementExecution(TestCase):
         # When.
         self.assertRaises(ClientError, self.qldb_driver.execute_lambda, lambda txn: txn.execute_statement(query))
 
+    def test_error_when_transaction_expires(self):
+        # Given.
+        def query_lambda(txn):
+            # wait for the transaction to expire
+            sleep(40)
+
+        # When.
+        self.assertRaises(ClientError, self.qldb_driver.execute_lambda, lambda executor: query_lambda(executor))
 
 def create_ion_values():
     ion_values = list()
