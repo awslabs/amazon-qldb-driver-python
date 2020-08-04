@@ -229,17 +229,23 @@ class QldbDriver:
 
         retry_config = self._retry_config if retry_config is None else retry_config
         context = _LambdaExecutionContext()
+        get_session_attempt = 0
         while True:
             try:
+                get_session_attempt = get_session_attempt + 1
                 with self._get_session() as session:
                     return session._execute_lambda(query_lambda, retry_config, context)
             except ClientError as ce:
+                if get_session_attempt >= self._pool_limit + 3:
+                    raise ce
+
                 if is_transaction_expired_exception(ce):
                     raise ce
                 if is_invalid_session_exception(ce):
                     pass
                 else:
                     raise ce
+
 
     @property
     def read_ahead(self):
