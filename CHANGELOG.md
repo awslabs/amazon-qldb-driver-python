@@ -1,5 +1,14 @@
+### [Release 3.0.0rc2](https://github.com/awslabs/amazon-qldb-driver-python/releases/tag/v3.0.0rc2) (August 6, 2020)
+Note: This version is a release candidate and may not be production ready.
+
+#### Bug Fixes:
+
+* Fixed bug which leads to infinite number of retries when a transaction expires.
+* Fixed bug which causes transaction to remain open when an unknown exception is thrown inside execute_lambda.
+* Added a limit to the number of times the driver will try to get(from pool)/create a session. 
+
 ### [Release 3.0.0-rc.1](https://github.com/awslabs/amazon-qldb-driver-python/releases/tag/v3.0.0-rc.1) (June 22, 2020)
-Note this version is a release candidate and may not be production ready.
+Note: This version is a release candidate and may not be production ready.
 
 #### Breaking changes:
 
