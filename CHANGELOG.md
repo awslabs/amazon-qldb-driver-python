@@ -1,3 +1,10 @@
+### Release 3.0.0 (August 20, 2020)
+This is a public and generally available(GA) release of the driver, and this version can be used in production applications.
+
+#### Announcements
+* The release candidate 2 (v3.0.0rc.2) has been selected as a final release of v3.0.0. No new changes are
+introduced between v3.0.0rc.2 and v3.0.0. Please check the [release notes](https://github.com/awslabs/amazon-qldb-driver-python/releases/tag/v3.0.0).
+
 ### [Release 3.0.0rc2](https://github.com/awslabs/amazon-qldb-driver-python/releases/tag/v3.0.0rc2) (August 6, 2020)
 Note: This version is a release candidate and may not be production ready.
 
