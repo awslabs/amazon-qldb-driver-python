@@ -96,7 +96,12 @@ class BaseQldbDriver(ABC):
             if not isinstance(config, Config):
                 raise TypeError('config must be of type botocore.config.Config. Found: {}'
                                 .format(type(config).__name__))
-            self._config = config.merge(DEFAULT_CONFIG)
+            if config.user_agent_extra is not None:
+                newAgent= SERVICE_DESCRIPTION + "/" + config.user_agent_extra
+                agentConfig = Config(user_agent_extra=newAgent, retries=SERVICE_RETRY)
+                self._config = config.merge(agentConfig)
+            else:
+                self._config = config.merge(DEFAULT_CONFIG)
         else:
             self._config = DEFAULT_CONFIG
 

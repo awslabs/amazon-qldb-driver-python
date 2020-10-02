@@ -17,6 +17,7 @@ from botocore.exceptions import ClientError
 
 from pyqldb.driver.qldb_driver import QldbDriver
 from pyqldb.errors import DriverClosedError
+from pyqldb import __version__
 
 DEFAULT_SESSION_NAME = 'qldb-session'
 DEFAULT_READ_AHEAD = 0
@@ -26,6 +27,8 @@ MOCK_CONFIG = Config()
 MOCK_LEDGER_NAME = 'QLDB'
 MOCK_MESSAGE = 'message'
 MOCK_BOTO3_SESSION = Session()
+MOCK_EXTERNAL_AGENT = "NewAgent"
+MOCK_NEW_AGENT_CONFIG = Config(user_agent_extra=MOCK_EXTERNAL_AGENT)
 
 
 class TestQldbDriver(TestCase):
@@ -74,6 +77,12 @@ class TestQldbDriver(TestCase):
                                                     verify=None)
         self.assertEqual(qldb_driver._client, mock_session.client())
         mock_logger_warning.assert_called_once()
+
+    def test_constructor_with_boto3_session_and_new_user_agent(self):
+        qldb_driver = QldbDriver(MOCK_LEDGER_NAME,  config=MOCK_NEW_AGENT_CONFIG)
+
+        resultAgent = 'QLDB Driver for Python v{}'.format(__version__) + "/" + MOCK_EXTERNAL_AGENT
+        self.assertEqual(qldb_driver._config.user_agent_extra, resultAgent)
 
     def test_constructor_with_invalid_boto3_session(self):
         mock_session = Mock()
