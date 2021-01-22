@@ -18,6 +18,7 @@ def pytest_addoption(parser):
         "--ledger_suffix", action="store", default="", help=""
     )
 
+
 @pytest.fixture(scope='class', autouse=True)
 def config_variables(request):
     # Set as class attribute on the invoking test context.
