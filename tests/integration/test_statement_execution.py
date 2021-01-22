@@ -9,7 +9,6 @@
 # CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
 # and limitations under the License.
 from time import sleep
-
 import pytest
 from unittest import TestCase
 
@@ -19,7 +18,7 @@ from botocore.exceptions import ClientError
 from pyqldb.errors import is_occ_conflict_exception
 
 from .constants import CREATE_TABLE_NAME, COLUMN_NAME, MULTIPLE_DOCUMENT_VALUE_1, MULTIPLE_DOCUMENT_VALUE_2, \
-    INDEX_ATTRIBUTE, LEDGER_NAME, SINGLE_DOCUMENT_VALUE, TABLE_NAME
+    MULTIPLE_DOCUMENT_VALUE_3, INDEX_ATTRIBUTE, LEDGER_NAME, SINGLE_DOCUMENT_VALUE, TABLE_NAME
 from .integration_test_base import IntegrationTestBase
 
 
@@ -265,6 +264,60 @@ class TestStatementExecution(TestCase):
 
         # Then.
         self.assertEqual(SINGLE_DOCUMENT_VALUE, value)
+
+    def test_query_stats(self):
+        def fill_table():
+            # Create Ion structs to insert to populate table
+            parameter_1 = loads(dumps({COLUMN_NAME: MULTIPLE_DOCUMENT_VALUE_1}))
+            parameter_2 = loads(dumps({COLUMN_NAME: MULTIPLE_DOCUMENT_VALUE_2}))
+            parameter_3 = loads(dumps({COLUMN_NAME: MULTIPLE_DOCUMENT_VALUE_3}))
+            query = "INSERT INTO {} <<?, ?, ?>>".format(TABLE_NAME)
+
+            self.qldb_driver.execute_lambda(
+                lambda txn: txn.execute_statement(query, parameter_1, parameter_2, parameter_3))
+
+        def assert_io_usage_and_timing_information(cursor):
+            # Consumed IO test
+            consumed_ios = cursor.get_consumed_ios()
+            self.assertIsNotNone(consumed_ios)
+            read_ios = consumed_ios.get('ReadIOs')
+            self.assertTrue(read_ios >= 0)
+
+            # Timing information test
+            timing_information = cursor.get_timing_information()
+            self.assertIsNotNone(timing_information)
+            processing_time_milliseconds = timing_information.get('ProcessingTimeMilliseconds')
+            self.assertTrue(processing_time_milliseconds >= 0)
+
+        def stream_cursor_query_stats(query):
+            def execute_statement_and_test_stream_cursor(txn, query):
+                cursor = txn.execute_statement(query)
+                for row in cursor:
+                    assert_io_usage_and_timing_information(cursor)
+
+            self.qldb_driver.execute_lambda(
+                lambda txn: execute_statement_and_test_stream_cursor(txn, query))
+
+        def buffered_cursor_query_stats(query):
+            # Test buffered cursor's accumulated values of execution stats
+            def execute_statement_and_test_buffered_cursor(txn, query):
+                cursor = txn.execute_statement(query)
+                return cursor
+
+            buffered_cursor = self.qldb_driver.execute_lambda(
+                lambda txn: execute_statement_and_test_buffered_cursor(txn, query))
+            assert_io_usage_and_timing_information(buffered_cursor)
+
+        search_query = "SELECT * FROM {} as n1, {} as n2, {} as n3, {} as n4, {} as n5, {} as n6".format(TABLE_NAME,
+                                                                                                         TABLE_NAME,
+                                                                                                         TABLE_NAME,
+                                                                                                         TABLE_NAME,
+                                                                                                         TABLE_NAME,
+                                                                                                         TABLE_NAME)
+        # Call the routines
+        fill_table()
+        stream_cursor_query_stats(search_query)
+        buffered_cursor_query_stats(search_query)
 
     def test_insert_multiple_documents(self):
         # Given.

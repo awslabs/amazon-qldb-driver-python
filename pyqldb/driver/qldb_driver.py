@@ -186,7 +186,7 @@ class QldbDriver:
         Get the list of table names in the ledger.
 
         :rtype: :py:class:`pyqldb.cursor.buffered_cursor.BufferedCursor`
-        :return: Iterable of table names in :py:class:`amazon.ion.simple_types.IonPyText`.
+        :return: Iterable of table names in :py:class:`amazon.ion.simple_types.IonPyText` format found in the ledger.
 
         :raises DriverClosedError: When this driver is closed.
         """
@@ -202,9 +202,12 @@ class QldbDriver:
         This is the primary method to execute a transaction against Amazon QLDB ledger.
 
         :type query_lambda: function
-        :param query_lambda: The lambda function to execute. A lambda function cannot have any side effects as
-                             it may be invoked multiple times, and the result cannot be trusted until the transaction is
-                             committed.
+        :param query_lambda: The lambda function to execute. The function receives an instance of
+                             :py:class:`pyqldb.execution.executor.Executor` which can be used to execute statements.
+                             The instance of :py:class:`pyqldb.execution.executor.Executor` wraps an implicitly created
+                             transaction. The transaction will be implicitly committed when the passed function returns.
+                             The lambda function cannot have any side effects as it may be invoked multiple
+                             times, and the result cannot be trusted until the transaction is committed.
 
         :type retry_config: :py:class:`pyqldb.config.retry_config.RetryConfig`
         :param retry_config: Config to specify max number of retries, base and custom backoff strategy for retries.
