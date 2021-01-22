@@ -17,8 +17,8 @@ class StreamCursor:
     """
     An iterable class representing a stream cursor on a statement's result set.
 
-    :type page: dict
-    :param page: The page containing the initial result set data dictionary of the statement's execution.
+    :type statement_result: dict
+    :param statement_result: The initial result set data dictionary of the statement's execution.
 
     :type session: :py:class:`pyqldb.communication.session_client.SessionClient`
     :param session: The parent session that represents the communication channel to QLDB.
@@ -26,12 +26,17 @@ class StreamCursor:
     :type transaction_id: str
     :param transaction_id: The ID of this cursor's parent transaction, required to fetch pages.
     """
-    def __init__(self, page, session, transaction_id):
-        self._page = page
+    def __init__(self, statement_result, session, transaction_id):
+        self._page = statement_result.get('FirstPage')
         self._session = session
         self._index = 0
         self._is_open = True
         self._transaction_id = transaction_id
+        self._read_ios = None
+        self._write_ios = None
+        self._processing_time_milliseconds = None
+
+        self._accumulate_query_stats(statement_result)
 
     def __iter__(self):
         """
@@ -82,9 +87,32 @@ class StreamCursor:
         Get the next page using this cursor's session.
         """
         statement_result = self._session._fetch_page(self._transaction_id, self._page.get('NextPageToken'))
+        self._accumulate_query_stats(statement_result)
+
         page = statement_result.get('Page')
         self._page = page
         self._index = 0
+
+    def _accumulate_query_stats(self, statement_result):
+        """
+        From the statement_result, get the query stats and accumulate them.
+        """
+
+        def accumulate(statement_result, query_statistics_key, metric_key, metric_to_accumulate):
+            query_statistics = statement_result.get(query_statistics_key)
+            if query_statistics:
+                metric = query_statistics.get(metric_key)
+                if metric:
+                    if metric_to_accumulate is None:
+                        metric_to_accumulate = 0
+                    metric_to_accumulate += metric
+            return metric_to_accumulate
+
+        self._processing_time_milliseconds = accumulate(statement_result, 'TimingInformation',
+                                                        'ProcessingTimeMilliseconds',
+                                                        self._processing_time_milliseconds)
+        self._read_ios = accumulate(statement_result, 'ConsumedIOs', 'ReadIOs', self._read_ios)
+        self._write_ios = accumulate(statement_result, 'ConsumedIOs', 'WriteIOs', self._write_ios)
 
     @staticmethod
     def _value_holder_to_ion_value(value):
@@ -94,3 +122,21 @@ class StreamCursor:
         binary = value.get('IonBinary')
         ion_value = loads(binary)
         return ion_value
+
+    def get_consumed_ios(self):
+        """
+        Return a dictionary containing the accumulated amount of IO requests for a statement's execution.
+
+        :rtype: dict
+        :return: The amount of read IO requests for a statement's execution.
+        """
+        return {'ReadIOs': self._read_ios}
+
+    def get_timing_information(self):
+        """
+        Return a dictionary containing the accumulated amount of processing time for a statement's execution.
+
+        :rtype: dict
+        :return: The amount of processing time in milliseconds for a statement's execution.
+        """
+        return {'ProcessingTimeMilliseconds': self._processing_time_milliseconds}

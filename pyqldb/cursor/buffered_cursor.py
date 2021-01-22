@@ -9,7 +9,6 @@
 # CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
 # and limitations under the License.
 
-
 class BufferedCursor:
     """
     Implementation of a cursor which buffers all values in memory, rather than stream them from QLDB during retrieval.
@@ -17,12 +16,15 @@ class BufferedCursor:
     :type cursor: :py:class:`pyqldb.cursor.stream_cursor.StreamCursor`
     :param cursor: The cursor object to iterate through results and place into memory.
     """
+
     def __init__(self, cursor):
         self._buffered_values = []
         for item in cursor:
             self._buffered_values.append(item)
 
         self._buffered_values_iterator = iter(self._buffered_values)
+        self._consumed_ios = cursor.get_consumed_ios()
+        self._timing_information = cursor.get_timing_information()
 
     def __iter__(self):
         """
@@ -35,3 +37,21 @@ class BufferedCursor:
         Iterator function to implement the iterator protocol. Get next value in _buffered_values_iterator.
         """
         return next(self._buffered_values_iterator)
+
+    def get_consumed_ios(self):
+        """
+        Return a dictionary containing the total amount of IO requests for a statement's execution.
+
+        :rtype: dict
+        :return: The amount of read IO requests for a statement's execution.
+        """
+        return self._consumed_ios
+
+    def get_timing_information(self):
+        """
+        Return a dictionary containing the total amount of processing time for a statement's execution.
+
+        :rtype: dict
+        :return: The amount of processing time in milliseconds for a statement's execution.
+        """
+        return self._timing_information

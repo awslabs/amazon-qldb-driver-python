@@ -2,10 +2,10 @@
 This is a public and generally available(GA) release of the driver, and this version can be used in production applications.
 
 #### Announcements
-* The release candidate 2 (v3.0.0rc.2) has been selected as a final release of v3.0.0. No new changes are
+* The release candidate 2 (v3.0.0rc.2) has been selected as a final release of v3.0.0. No new changes are 
 introduced between v3.0.0rc.2 and v3.0.0. Please check the [release notes](https://github.com/awslabs/amazon-qldb-driver-python/releases/tag/v3.0.0).
 
-### [Release 3.0.0rc2](https://github.com/awslabs/amazon-qldb-driver-python/releases/tag/v3.0.0rc2) (August 6, 2020)
+### Release 3.0.0rc2 (August 6, 2020)
 Note: This version is a release candidate and may not be production ready.
 
 #### Bug Fixes:
@@ -14,7 +14,7 @@ Note: This version is a release candidate and may not be production ready.
 * Fixed bug which causes transaction to remain open when an unknown exception is thrown inside execute_lambda.
 * Added a limit to the number of times the driver will try to get(from pool)/create a session. 
 
-### [Release 3.0.0-rc.1](https://github.com/awslabs/amazon-qldb-driver-python/releases/tag/v3.0.0-rc.1) (June 22, 2020)
+### Release 3.0.0-rc.1 (June 22, 2020)
 Note: This version is a release candidate and may not be production ready.
 
 #### Breaking changes:
@@ -32,7 +32,6 @@ instance
 from `QldbDriver.execute_lambda`.
 * [(#27)](https://github.com/awslabs/amazon-qldb-driver-python/issues/27) Moved `retry_limit` from `QldbDriver` to 
 `RetryConfig`.
- [(#34)](https://github.com/awslabs/amazon-qldb-driver-python/issues/34)  Removed `QldbDriver.execute_statement`.
 
 #### New features:
 
@@ -41,7 +40,7 @@ backoffs.
 
 #### Announcements 
 
-* Dropping support for Python v3.4 and v3.5. Going forward the minimum Python version required will be v3.6 for Pyqldb 3.x 
+* Dropping support Python v3.4 and v3.5. Going forward the minimum Python version required will be v3.6 for Pyqldb 3.x 
 series.
 
 
@@ -57,10 +56,10 @@ The driver requires Python 3.4 or later, earlier it was mentioned to be 3.x
 
 #### New features:
 * Added Execute methods to PooledQldbDriver
-* Added support for python native types for [execute_statement](https://amazon-qldb-driver-python.readthedocs.io/en/v2.0.0/reference/session/pooled_qldb_session.html#pyqldb.session.pooled_qldb_session.PooledQldbSession.execute_statement) parameters
+* Added support for python native types for [execute_statement](https://amazon-qldb-driver-python.readthedocs.io/en/v2.0.0_a/reference/session/pooled_qldb_session.html#pyqldb.session.pooled_qldb_session.PooledQldbSession.execute_statement) parameters
 
 #### Unavoidable breaking changes:
-* In order to be more pythonic, the method signature of [execute_statement](https://amazon-qldb-driver-python.readthedocs.io/en/v2.0.0/reference/session/pooled_qldb_session.html#pyqldb.session.pooled_qldb_session.PooledQldbSession.execute_statement) has 
+* In order to be more pythonic, the method signature of [execute_statement](https://amazon-qldb-driver-python.readthedocs.io/en/v2.0.0_a/reference/session/pooled_qldb_session.html#pyqldb.session.pooled_qldb_session.PooledQldbSession.execute_statement) has 
 been changed to receive *args. This is a breaking change for any application 
 that uses 1.0.0-rc.2 version of the driver. Starting v2.0, applications should 
 pass execute_statement parameters as comma separated arguments instead of passing them as a list.
