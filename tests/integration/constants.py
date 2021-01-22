@@ -19,5 +19,6 @@ COLUMN_NAME = "Name"
 SINGLE_DOCUMENT_VALUE = "SingleDocumentValue"
 MULTIPLE_DOCUMENT_VALUE_1 = "MultipleDocumentValue1"
 MULTIPLE_DOCUMENT_VALUE_2 = "MultipleDocumentValue2"
+MULTIPLE_DOCUMENT_VALUE_3 = "MultipleDocumentValue3"
 
 LEDGER_NAME = "Pytest"

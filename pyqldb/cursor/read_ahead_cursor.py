@@ -25,8 +25,8 @@ class ReadAheadCursor(StreamCursor):
     An iterable class representing a read ahead cursor on a statement's result set. This class will create a queue of
     size `read_ahead` and fetch results asynchronously to fill the queue.
 
-    :type page: dict
-    :param page: The page containing the initial result set data dictionary of the statement's execution.
+    :type statement_result: dict
+    :param statement_result: The initial result set data dictionary of the statement's execution.
 
     :type session: :py:class:`pyqldb.communication.session_client.SessionClient`
     :param session: The parent session that represents the communication channel to QLDB.
@@ -40,8 +40,8 @@ class ReadAheadCursor(StreamCursor):
     :type executor: :py:class:`concurrent.futures.thread.ThreadPoolExecutor`
     :param executor: The optional executor for asynchronous retrieval. If none specified, a new thread is created.
     """
-    def __init__(self, page, session, transaction_id, read_ahead, executor):
-        super().__init__(page, session, transaction_id)
+    def __init__(self, statement_result, session, transaction_id, read_ahead, executor):
+        super().__init__(statement_result, session, transaction_id)
         self._queue = Queue(read_ahead - 1)
         if executor is None:
             thread = Thread(target=self._populate_queue)
@@ -63,23 +63,24 @@ class ReadAheadCursor(StreamCursor):
         queue_result = self._queue.get()
         if isinstance(queue_result, Exception):
             raise queue_result
-        self._page = queue_result
+        super()._accumulate_query_stats(queue_result)
+        self._page = queue_result.get('Page')
         self._index = 0
 
     def _populate_queue(self):
         """
-        Fill the buffer queue with pages. If ClientError is received, it is put in the queue and execution stops.
-        If the parent transaction is closed, stop fetching results.
+        Fill the buffer queue with the statement_result fetched. If ClientError is received, it is put in the queue and
+        execution stops. If the parent transaction is closed, stop fetching results.
         """
         try:
             next_page_token = self._page.get('NextPageToken')
             while next_page_token is not None:
                 statement_result = self._session._fetch_page(self._transaction_id, next_page_token)
-                page = statement_result.get('Page')
                 while True:
                     try:
                         # Timeout of 50ms.
-                        self._queue.put(page, timeout=0.05)
+                        self._queue.put(statement_result, timeout=0.05)
+                        page = statement_result.get('Page')
                         next_page_token = page.get('NextPageToken')
                         break
                     except Full:

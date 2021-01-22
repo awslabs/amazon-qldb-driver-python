@@ -164,11 +164,11 @@ class Transaction:
         parameters = tuple(map(self._to_ion, parameters))
         self._update_hash(statement, parameters)
         statement_result = self._session._execute_statement(self._id, statement, parameters)
-        first_page = statement_result.get('FirstPage')
+
         if self._read_ahead > 0:
-            cursor = ReadAheadCursor(first_page, self._session, self._id, self._read_ahead, self._executor)
+            cursor = ReadAheadCursor(statement_result, self._session, self._id, self._read_ahead, self._executor)
         else:
-            cursor = StreamCursor(first_page, self._session, self._id)
+            cursor = StreamCursor(statement_result, self._session, self._id)
 
         self._cursors.append(cursor)
         return cursor

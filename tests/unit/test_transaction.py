@@ -31,8 +31,11 @@ ION_PARAMETER_1 = loads(dumps(NATIVE_PARAMETER_1))
 ION_PARAMETER_2 = loads(dumps(NATIVE_PARAMETER_2))
 MOCK_READ_AHEAD = 0
 MOCK_STATEMENT = 'SELECT * FROM FOO'
-MOCK_STATEMENT_RESULT = {'Values': [], 'NextPageToken': 'token'}
-MOCK_FIRST_PAGE_RESULT = {'FirstPage': MOCK_STATEMENT_RESULT}
+MOCK_FIRST_PAGE_RESULT = {
+    'FirstPage': {'Values': [], 'NextPageToken': 'token'},
+    'TimingInformation': {'ProcessingTimeMilliseconds': 1},
+    'ConsumedIOs': {'ReadIOs': 1, 'WriteIOs': 1}
+}
 
 
 @patch('pyqldb.communication.session_client.SessionClient')
@@ -207,7 +210,7 @@ class TestTransaction(TestCase):
 
         mock_session._execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, ())
         mock_update_hash.assert_called_once_with(MOCK_STATEMENT, ())
-        mock_cursor.assert_called_once_with(MOCK_STATEMENT_RESULT, mock_session, MOCK_ID)
+        mock_cursor.assert_called_once_with(MOCK_FIRST_PAGE_RESULT, mock_session, MOCK_ID)
         self.assertEqual(transaction._cursors, [mock_cursor])
         self.assertEqual(cursor, mock_cursor)
 
@@ -223,7 +226,7 @@ class TestTransaction(TestCase):
 
         mock_session._execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, ())
         mock_update_hash.assert_called_once_with(MOCK_STATEMENT, ())
-        mock_cursor.assert_called_once_with(MOCK_STATEMENT_RESULT, mock_session, MOCK_ID, 2, mock_executor)
+        mock_cursor.assert_called_once_with(MOCK_FIRST_PAGE_RESULT, mock_session, MOCK_ID, 2, mock_executor)
         self.assertEqual(transaction._cursors, [mock_cursor])
         self.assertEqual(cursor, mock_cursor)
 
@@ -240,7 +243,7 @@ class TestTransaction(TestCase):
         mock_session._execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, (MOCK_PARAMETER_1,
                                                                                           MOCK_PARAMETER_2))
         mock_update_hash.assert_called_once_with(MOCK_STATEMENT, (MOCK_PARAMETER_1, MOCK_PARAMETER_2))
-        mock_cursor.assert_called_once_with(MOCK_STATEMENT_RESULT, mock_session, MOCK_ID)
+        mock_cursor.assert_called_once_with(MOCK_FIRST_PAGE_RESULT, mock_session, MOCK_ID)
         self.assertEqual(transaction._cursors, [mock_cursor])
         self.assertEqual(cursor, mock_cursor)
 
@@ -257,7 +260,7 @@ class TestTransaction(TestCase):
         mock_session._execute_statement.assert_called_once_with(MOCK_ID, MOCK_STATEMENT, (ION_PARAMETER_1,
                                                                                           ION_PARAMETER_1))
         mock_update_hash.assert_called_once_with(MOCK_STATEMENT, (ION_PARAMETER_1, ION_PARAMETER_2))
-        mock_cursor.assert_called_once_with(MOCK_STATEMENT_RESULT, mock_session, MOCK_ID)
+        mock_cursor.assert_called_once_with(MOCK_FIRST_PAGE_RESULT, mock_session, MOCK_ID)
         self.assertEqual(transaction._cursors, [mock_cursor])
         self.assertEqual(cursor, mock_cursor)
 
