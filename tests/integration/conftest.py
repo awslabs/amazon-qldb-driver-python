@@ -14,9 +14,12 @@ import pytest
 def pytest_addoption(parser):
     # Collect config values from cmd line or setup.cfg
     parser.addoption('--region', action='store', help='')
-
+    parser.addoption(
+        "--ledger_suffix", action="store", default="", help=""
+    )
 
 @pytest.fixture(scope='class', autouse=True)
 def config_variables(request):
     # Set as class attribute on the invoking test context.
     request.cls.region = request.config.getoption("--region")
+    request.cls.ledger_suffix = request.config.getoption("--ledger_suffix").replace(".", "-")

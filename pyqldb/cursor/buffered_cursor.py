@@ -9,6 +9,7 @@
 # CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
 # and limitations under the License.
 
+
 class BufferedCursor:
     """
     Implementation of a cursor which buffers all values in memory, rather than stream them from QLDB during retrieval.
@@ -16,7 +17,6 @@ class BufferedCursor:
     :type cursor: :py:class:`pyqldb.cursor.stream_cursor.StreamCursor`
     :param cursor: The cursor object to iterate through results and place into memory.
     """
-
     def __init__(self, cursor):
         self._buffered_values = []
         for item in cursor:

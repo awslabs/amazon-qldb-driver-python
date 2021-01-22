@@ -76,6 +76,24 @@ class StreamCursor:
         """
         self._is_open = False
 
+    def get_consumed_ios(self):
+        """
+        Return a dictionary containing the accumulated amount of IO requests for a statement's execution.
+
+        :rtype: dict
+        :return: The amount of read IO requests for a statement's execution.
+        """
+        return {'ReadIOs': self._read_ios}
+
+    def get_timing_information(self):
+        """
+        Return a dictionary containing the accumulated amount of processing time for a statement's execution.
+
+        :rtype: dict
+        :return: The amount of processing time in milliseconds for a statement's execution.
+        """
+        return {'ProcessingTimeMilliseconds': self._processing_time_milliseconds}
+
     def _are_there_more_results(self):
         """
         Check if there are more results.
@@ -97,22 +115,22 @@ class StreamCursor:
         """
         From the statement_result, get the query stats and accumulate them.
         """
+        self._processing_time_milliseconds = self._accumulate(statement_result, 'TimingInformation',
+                                                              'ProcessingTimeMilliseconds',
+                                                              self._processing_time_milliseconds)
+        self._read_ios = self._accumulate(statement_result, 'ConsumedIOs', 'ReadIOs', self._read_ios)
+        self._write_ios = self._accumulate(statement_result, 'ConsumedIOs', 'WriteIOs', self._write_ios)
 
-        def accumulate(statement_result, query_statistics_key, metric_key, metric_to_accumulate):
-            query_statistics = statement_result.get(query_statistics_key)
-            if query_statistics:
-                metric = query_statistics.get(metric_key)
-                if metric:
-                    if metric_to_accumulate is None:
-                        metric_to_accumulate = 0
-                    metric_to_accumulate += metric
-            return metric_to_accumulate
-
-        self._processing_time_milliseconds = accumulate(statement_result, 'TimingInformation',
-                                                        'ProcessingTimeMilliseconds',
-                                                        self._processing_time_milliseconds)
-        self._read_ios = accumulate(statement_result, 'ConsumedIOs', 'ReadIOs', self._read_ios)
-        self._write_ios = accumulate(statement_result, 'ConsumedIOs', 'WriteIOs', self._write_ios)
+    @staticmethod
+    def _accumulate(statement_result, query_statistics_key, metric_key, metric_to_accumulate):
+        query_statistics = statement_result.get(query_statistics_key)
+        if query_statistics:
+            metric = query_statistics.get(metric_key)
+            if metric:
+                if metric_to_accumulate is None:
+                    metric_to_accumulate = 0
+                metric_to_accumulate += metric
+        return metric_to_accumulate
 
     @staticmethod
     def _value_holder_to_ion_value(value):
@@ -122,21 +140,3 @@ class StreamCursor:
         binary = value.get('IonBinary')
         ion_value = loads(binary)
         return ion_value
-
-    def get_consumed_ios(self):
-        """
-        Return a dictionary containing the accumulated amount of IO requests for a statement's execution.
-
-        :rtype: dict
-        :return: The amount of read IO requests for a statement's execution.
-        """
-        return {'ReadIOs': self._read_ios}
-
-    def get_timing_information(self):
-        """
-        Return a dictionary containing the accumulated amount of processing time for a statement's execution.
-
-        :rtype: dict
-        :return: The amount of processing time in milliseconds for a statement's execution.
-        """
-        return {'ProcessingTimeMilliseconds': self._processing_time_milliseconds}

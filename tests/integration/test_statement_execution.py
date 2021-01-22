@@ -27,7 +27,7 @@ class TestStatementExecution(TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.integration_test_base = IntegrationTestBase(LEDGER_NAME, cls.region)
+        cls.integration_test_base = IntegrationTestBase(LEDGER_NAME+cls.ledger_suffix, cls.region)
         cls.integration_test_base.force_delete_ledger()
         cls.integration_test_base.create_ledger()
 
