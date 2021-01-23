@@ -31,7 +31,6 @@ logger = getLogger(__name__)
 SERVICE_DESCRIPTION = 'QLDB Driver for Python v{}'.format(__version__)
 SERVICE_NAME = 'qldb-session'
 SERVICE_RETRY = {'max_attempts': 0}
-DEFAULT_CONFIG = Config(user_agent_extra=SERVICE_DESCRIPTION, retries=SERVICE_RETRY)
 DEFAULT_RETRY_CONFIG = RetryConfig()
 
 
@@ -74,7 +73,7 @@ class QldbDriver:
     :param aws_session_token: See [1].
 
     :type config: :py:class:`botocore.config.Config`
-    :param config: See [2]. Note that parameter user_agent_extra will be overwritten.
+    :param config: See [2]. Note that parameter user_agent_extra will be appended and retries will be overwritten.
 
     :type boto3_session: :py:class:`boto3.session.Session`
     :param boto3_session: The boto3 session to create the client with (see [1]). The boto3 session is expected to be
@@ -116,9 +115,14 @@ class QldbDriver:
             if not isinstance(config, Config):
                 raise TypeError('config must be of type botocore.config.Config. Found: {}'
                                 .format(type(config).__name__))
-            self._config = config.merge(DEFAULT_CONFIG)
+            self._config = config
+            self._config.retries = SERVICE_RETRY
+            if self._config.user_agent_extra:
+                self._config.user_agent_extra = ' '.join([SERVICE_DESCRIPTION, self._config.user_agent_extra])
+            else:
+                self._config.user_agent_extra = SERVICE_DESCRIPTION
         else:
-            self._config = DEFAULT_CONFIG
+            self._config = Config(user_agent_extra=SERVICE_DESCRIPTION, retries=SERVICE_RETRY)
 
         if retry_config is not None:
             if not isinstance(retry_config, RetryConfig):

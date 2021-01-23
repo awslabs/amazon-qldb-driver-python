@@ -25,6 +25,13 @@ class Executor:
     def __init__(self, transaction):
         self._transaction = transaction
 
+    @property
+    def transaction_id(self):
+        """
+        The **read-only** ID of this transaction.
+        """
+        return self._transaction.transaction_id
+
     def abort(self):
         """
         Abort the transaction and roll back any changes.

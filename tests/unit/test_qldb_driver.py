@@ -16,7 +16,7 @@ from botocore.exceptions import ClientError
 from botocore.config import Config
 from boto3.session import Session
 
-from pyqldb.driver.qldb_driver import QldbDriver
+from pyqldb.driver.qldb_driver import QldbDriver, SERVICE_DESCRIPTION
 from pyqldb.errors import DriverClosedError
 from pyqldb.session.qldb_session import QldbSession
 
@@ -27,7 +27,7 @@ DEFAULT_RETRY_LIMIT = 4
 DEFAULT_BACKOFF_BASE = 10
 DEFAULT_TIMEOUT_SECONDS = 0.001
 EMPTY_STRING = ''
-MOCK_CONFIG = Config()
+MOCK_CONFIG = Config(user_agent_extra='user_agent')
 MOCK_LEDGER_NAME = 'QLDB'
 MOCK_MESSAGE = 'message'
 MOCK_BOTO3_SESSION = Session()
@@ -39,22 +39,18 @@ class TestQldbDriver(TestCase):
     @patch('pyqldb.driver.qldb_driver.AtomicInteger')
     @patch('pyqldb.driver.qldb_driver.BoundedSemaphore')
     @patch('pyqldb.driver.qldb_driver.client')
-    @patch('pyqldb.driver.qldb_driver.Config.merge')
-    def test_constructor_with_valid_config(self, mock_config_merge, mock_client, mock_bounded_semaphore,
+    def test_constructor_with_valid_config(self, mock_client, mock_bounded_semaphore,
                                            mock_atomic_integer, mock_queue):
         mock_queue.return_value = mock_queue
         mock_atomic_integer.return_value = mock_atomic_integer
         mock_bounded_semaphore.return_value = mock_bounded_semaphore
         mock_client.return_value = mock_client
-        mock_config_merge.return_value = mock_config_merge
-        mock_config_merge.max_pool_connections = DEFAULT_MAX_CONCURRENT_TRANSACTIONS
 
         qldb_driver = QldbDriver(MOCK_LEDGER_NAME, config=MOCK_CONFIG)
 
-        mock_config_merge.assert_called_once()
         mock_client.assert_called_once_with(DEFAULT_SESSION_NAME, aws_access_key_id=None,
                                             aws_secret_access_key=None, aws_session_token=None,
-                                            config=mock_config_merge, endpoint_url=None, region_name=None, verify=None)
+                                            config=MOCK_CONFIG, endpoint_url=None, region_name=None, verify=None)
         self.assertEqual(qldb_driver._ledger_name, MOCK_LEDGER_NAME)
         self.assertEqual(qldb_driver._retry_config.retry_limit, DEFAULT_RETRY_LIMIT)
         self.assertEqual(qldb_driver._retry_config.base, DEFAULT_BACKOFF_BASE)
@@ -77,26 +73,22 @@ class TestQldbDriver(TestCase):
     @patch('pyqldb.driver.qldb_driver.AtomicInteger')
     @patch('pyqldb.driver.qldb_driver.BoundedSemaphore')
     @patch('pyqldb.driver.qldb_driver.client')
-    @patch('pyqldb.driver.qldb_driver.Config.merge')
-    def test_default_constructor_with_parameters(self, mock_config_merge, mock_client, mock_bounded_semaphore,
+    def test_default_constructor_with_parameters(self, mock_client, mock_bounded_semaphore,
                                                  mock_atomic_integer, mock_queue):
         mock_queue.return_value = mock_queue
         mock_atomic_integer.return_value = mock_atomic_integer
         mock_bounded_semaphore.return_value = mock_bounded_semaphore
         mock_client.return_value = mock_client
-        mock_config_merge.return_value = mock_config_merge
-        mock_config_merge.max_pool_connections = DEFAULT_MAX_CONCURRENT_TRANSACTIONS
 
         qldb_driver = QldbDriver(MOCK_LEDGER_NAME, region_name=EMPTY_STRING, verify=EMPTY_STRING,
                                  endpoint_url=EMPTY_STRING, aws_access_key_id=EMPTY_STRING,
                                  aws_secret_access_key=EMPTY_STRING, aws_session_token=EMPTY_STRING,
                                  config=MOCK_CONFIG)
 
-        mock_config_merge.assert_called_once()
         mock_client.assert_called_once_with(DEFAULT_SESSION_NAME, region_name=EMPTY_STRING, verify=EMPTY_STRING,
                                             endpoint_url=EMPTY_STRING, aws_access_key_id=EMPTY_STRING,
                                             aws_secret_access_key=EMPTY_STRING, aws_session_token=EMPTY_STRING,
-                                            config=mock_config_merge)
+                                            config=MOCK_CONFIG)
         self.assertEqual(qldb_driver._ledger_name, MOCK_LEDGER_NAME)
         self.assertEqual(qldb_driver._retry_config.retry_limit, DEFAULT_RETRY_LIMIT)
         self.assertEqual(qldb_driver._retry_config.base, DEFAULT_BACKOFF_BASE)
@@ -108,28 +100,22 @@ class TestQldbDriver(TestCase):
         mock_atomic_integer.assert_called_once_with(DEFAULT_MAX_CONCURRENT_TRANSACTIONS)
         mock_queue.assert_called_once_with()
 
-    @patch('pyqldb.driver.qldb_driver.Config.merge')
-    def test_constructor_with_boto3_session(self, mock_config_merge):
+    def test_constructor_with_boto3_session(self):
         mock_session = Mock(spec=MOCK_BOTO3_SESSION)
-        mock_config_merge.return_value = mock_config_merge
-        mock_config_merge.max_pool_connections = DEFAULT_MAX_CONCURRENT_TRANSACTIONS
 
         qldb_driver = QldbDriver(MOCK_LEDGER_NAME, boto3_session=mock_session, config=MOCK_CONFIG)
-        mock_session.client.assert_called_once_with(DEFAULT_SESSION_NAME, config=mock_config_merge, endpoint_url=None,
+        mock_session.client.assert_called_once_with(DEFAULT_SESSION_NAME, config=MOCK_CONFIG, endpoint_url=None,
                                                     verify=None)
         self.assertEqual(qldb_driver._client, mock_session.client())
+        self.assertTrue(SERVICE_DESCRIPTION in qldb_driver._config.user_agent_extra)
 
     @patch('pyqldb.driver.qldb_driver.logger.warning')
-    @patch('pyqldb.driver.qldb_driver.Config.merge')
-    def test_constructor_with_boto3_session_and_parameters_that_may_overwrite(self, mock_config_merge,
-                                                                              mock_logger_warning):
+    def test_constructor_with_boto3_session_and_parameters_that_may_overwrite(self, mock_logger_warning):
         mock_session = Mock(spec=MOCK_BOTO3_SESSION)
-        mock_config_merge.return_value = mock_config_merge
-        mock_config_merge.max_pool_connections = DEFAULT_MAX_CONCURRENT_TRANSACTIONS
         region_name = 'region_name'
         qldb_driver = QldbDriver(MOCK_LEDGER_NAME, boto3_session=mock_session, config=MOCK_CONFIG,
                                  region_name=region_name)
-        mock_session.client.assert_called_once_with(DEFAULT_SESSION_NAME, config=mock_config_merge, endpoint_url=None,
+        mock_session.client.assert_called_once_with(DEFAULT_SESSION_NAME, config=MOCK_CONFIG, endpoint_url=None,
                                                     verify=None)
         self.assertEqual(qldb_driver._client, mock_session.client())
         mock_logger_warning.assert_called_once()

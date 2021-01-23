@@ -26,9 +26,11 @@ MOCK_CLIENT_ERROR_MESSAGE = {'Error': {'Code': MOCK_ERROR_CODE, 'Message': MOCK_
 class TestExecutor(TestCase):
 
     def test_Executor(self, mock_transaction):
+        mock_transaction.transaction_id = 'txnId'
         executor = Executor(mock_transaction)
 
         self.assertEqual(executor._transaction, mock_transaction)
+        self.assertEqual(executor.transaction_id, 'txnId')
 
     def test_abort(self, mock_transaction):
         executor = Executor(mock_transaction)
