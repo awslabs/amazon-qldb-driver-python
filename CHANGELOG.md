@@ -6,6 +6,8 @@ Add support for obtaining basic server-side statistics on individual statement e
 * `get_consumed_ios` returns a dictionary containing the number of read IO requests for a statement execution.
 * `get_timing_information` returns a dictionary containing the server side processing time in milliseconds for a statement execution.
 * `get_consumed_ios` and `get_timing_information` methods in the `StreamCursor` class are stateful, meaning the statistics returned by them reflect the state at the time of method execution.
+* Add `transaction_id` property in `Executor` to provide the Transaction ID if needed.
+* The `Config` parameter of `QldbDriver` now appends the `user_agent_extra` value instead of overwriting it.
 
 ### Release 3.0.0 (August 20, 2020)
 This is a public and generally available(GA) release of the driver, and this version can be used in production applications.
