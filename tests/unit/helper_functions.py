@@ -11,8 +11,8 @@
 
 from unittest.mock import MagicMock
 
-from pyqldb.cursor.buffered_cursor import BufferedCursor
 from pyqldb.cursor.stream_cursor import StreamCursor
+
 
 def generate_statement_result(read_io, write_io, processing_time, next_page_token, is_first_page,
                               values=[{'IonBinary': 1}]):
@@ -35,21 +35,27 @@ def generate_statement_result(read_io, write_io, processing_time, next_page_toke
     return statement_result
 
 
-def assert_query_stats(class_instance, buffered_cursor, read_ios_assert, write_ios_assert, timing_information_assert):
+def assert_query_stats(test_case, buffered_cursor, read_ios_assert, write_ios_assert, timing_information_assert):
     """
     Asserts the query statistics returned by the cursor.
     """
     consumed_ios = buffered_cursor.get_consumed_ios()
-    class_instance.assertIsNotNone(consumed_ios)
-    read_ios = consumed_ios.get('ReadIOs')
+    if read_ios_assert is not None:
+        test_case.assertIsNotNone(consumed_ios)
+        read_ios = consumed_ios.get('ReadIOs')
 
-    class_instance.assertEqual(read_ios, read_ios_assert)
+        test_case.assertEqual(read_ios, read_ios_assert)
+    else:
+        test_case.assertEqual(consumed_ios, None)
 
     timing_information = buffered_cursor.get_timing_information()
-    class_instance.assertIsNotNone(timing_information)
-    processing_time_milliseconds = timing_information.get('ProcessingTimeMilliseconds')
+    if timing_information_assert is not None:
+        test_case.assertIsNotNone(timing_information)
+        processing_time_milliseconds = timing_information.get('ProcessingTimeMilliseconds')
 
-    class_instance.assertEqual(processing_time_milliseconds, timing_information_assert)
+        test_case.assertEqual(processing_time_milliseconds, timing_information_assert)
+    else:
+        test_case.assertEqual(timing_information_assert, None)
 
 
 def create_stream_cursor(mock_session, mock_statement_result_execute, mock_statement_result_fetch):

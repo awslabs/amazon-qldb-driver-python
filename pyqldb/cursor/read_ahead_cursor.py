@@ -26,7 +26,7 @@ class ReadAheadCursor(StreamCursor):
     size `read_ahead` and fetch results asynchronously to fill the queue.
 
     :type statement_result: dict
-    :param statement_result: The initial result set data dictionary of the statement's execution.
+    :param statement_result: The initial result set data dictionary of the statement execution.
 
     :type session: :py:class:`pyqldb.communication.session_client.SessionClient`
     :param session: The parent session that represents the communication channel to QLDB.

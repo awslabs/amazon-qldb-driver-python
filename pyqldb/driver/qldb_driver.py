@@ -88,7 +88,7 @@ class QldbDriver:
 
     :raises TypeError: When config is not an instance of :py:class:`botocore.config.Config`.
                        When boto3_session is not an instance of :py:class:`boto3.session.Session`.
-                       When retry_config is not an instance of :py:class:pyqldb.config.retry_config.RetryConfig.
+                       When retry_config is not an instance of :py:class:`pyqldb.config.retry_config.RetryConfig`.
 
     :raises ValueError: When `max_concurrent_transactions` exceeds the limit set by the client.
                         When `max_concurrent_transactions` is negative.
