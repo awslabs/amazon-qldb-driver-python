@@ -18,7 +18,7 @@ class StreamCursor:
     An iterable class representing a stream cursor on a statement's result set.
 
     :type statement_result: dict
-    :param statement_result: The initial result set data dictionary of the statement's execution.
+    :param statement_result: The initial result set data dictionary of the statement execution.
 
     :type session: :py:class:`pyqldb.communication.session_client.SessionClient`
     :param session: The parent session that represents the communication channel to QLDB.
@@ -78,21 +78,24 @@ class StreamCursor:
 
     def get_consumed_ios(self):
         """
-        Return a dictionary containing the accumulated amount of IO requests for a statement's execution.
+        Return a dictionary containing the accumulated amount of IO requests for a statement execution. Return None if
+        there were no read IOs for a statement execution.
 
-        :rtype: dict
-        :return: The amount of read IO requests for a statement's execution.
+        :rtype: dict/None
+        :return: The amount of read IO requests for a statement execution.
         """
-        return {'ReadIOs': self._read_ios}
+        return None if self._read_ios is None else {'ReadIOs': self._read_ios}
 
     def get_timing_information(self):
         """
-        Return a dictionary containing the accumulated amount of processing time for a statement's execution.
+        Return a dictionary containing the accumulated amount of processing time for a statement execution. Return None
+        if there was no timing information for a statement execution.
 
-        :rtype: dict
-        :return: The amount of processing time in milliseconds for a statement's execution.
+        :rtype: dict/None
+        :return: The amount of processing time in milliseconds for a statement execution.
         """
-        return {'ProcessingTimeMilliseconds': self._processing_time_milliseconds}
+        return None if self._processing_time_milliseconds is None else {'ProcessingTimeMilliseconds':
+                                                                            self._processing_time_milliseconds}
 
     def _are_there_more_results(self):
         """

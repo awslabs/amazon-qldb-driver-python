@@ -40,18 +40,20 @@ class BufferedCursor:
 
     def get_consumed_ios(self):
         """
-        Return a dictionary containing the total amount of IO requests for a statement's execution.
+        Return a dictionary containing the total amount of IO requests for a statement execution. Return None if there
+        were no read IOs for a statement execution.
 
-        :rtype: dict
-        :return: The amount of read IO requests for a statement's execution.
+        :rtype: dict/None
+        :return: The amount of read IO requests for a statement execution.
         """
         return self._consumed_ios
 
     def get_timing_information(self):
         """
-        Return a dictionary containing the total amount of processing time for a statement's execution.
+        Return a dictionary containing the total amount of processing time for a statement execution. Return None if
+        there was no timing information for a statement execution.
 
-        :rtype: dict
-        :return: The amount of processing time in milliseconds for a statement's execution.
+        :rtype: dict/None
+        :return: The amount of processing time in milliseconds for a statement execution.
         """
         return self._timing_information
