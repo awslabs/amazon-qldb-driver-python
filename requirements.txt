@@ -3,7 +3,7 @@ boto3==1.17.51
 botocore==1.20.51
 ionhash==1.1.0
 jmespath==0.10.0
-pyqldb==3.1.0
+pyqldb>=3.0.0
 python-dateutil==2.8.1
 s3transfer==0.3.7
 six>=1.14.0
