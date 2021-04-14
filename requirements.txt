@@ -6,5 +6,6 @@ jmespath==0.10.0
 pyqldb>=3.0.0
 python-dateutil==2.8.1
 s3transfer==0.3.7
+# intentionally downgrade indirect dependency six from 1.15.0 to 1.14.0
 six>=1.14.0
 urllib3==1.26.4
