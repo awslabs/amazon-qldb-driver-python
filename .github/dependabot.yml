@@ -5,5 +5,9 @@ updates:
     target-branch: "master"
     schedule:
       interval: "daily"
-    allow:
-      - dependency-type: "indirect"
+
+    ignore:
+      - dependency-name: "amazon.ion"
+      - dependency-name: "ionhash"
+      - dependency-name: "boto3"
+      - dependency-name: "botocore"
