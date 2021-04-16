@@ -6,7 +6,5 @@ updates:
     schedule:
       interval: "daily"
     allow:
-      - dependency-type: "all"
-    ignore:
-      - dependency-type: "direct"
+      - dependency-type: indirect
     open-pull-requests-limit: 20
