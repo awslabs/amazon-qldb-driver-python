@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    target-branch: "master"
+    schedule:
+      interval: "daily"
+
+    ignore:
+      - dependency-name: "amazon.ion"
+      - dependency-name: "ionhash"
+      - dependency-name: "boto3"
+      - dependency-name: "botocore"
