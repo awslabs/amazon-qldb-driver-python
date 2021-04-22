@@ -11,8 +11,6 @@
 
 from logging import getLogger
 
-from amazon.ion.simple_types import IonPyBool, IonPyBytes, IonPyDecimal, IonPyDict, IonPyFloat, IonPyInt, IonPyList, \
-    IonPyNull, IonPySymbol, IonPyText, IonPyTimestamp
 from amazon.ion.simpleion import dumps
 from botocore.exceptions import ClientError
 

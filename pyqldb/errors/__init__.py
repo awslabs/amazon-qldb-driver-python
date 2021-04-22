@@ -11,6 +11,9 @@
 
 import re
 
+from botocore.exceptions import EndpointConnectionError, ClientError, ConnectionClosedError, ConnectTimeoutError, \
+    ReadTimeoutError
+
 
 class IllegalStateError(Exception):
     pass
@@ -54,63 +57,79 @@ class StartTransactionError(Exception):
         self.error = error
 
 
+class ExecuteError(Exception):
+    def __init__(self, error, is_retryable, is_invalid_session_exception, transaction_id=None):
+        super().__init__('Error containing the context of a failure during execute')
+        self.error = error
+        self.is_retryable = is_retryable
+        self.is_invalid_session_exception = is_invalid_session_exception
+        self.transaction_id = transaction_id
+
+
 def is_occ_conflict_exception(e):
     """
     Is the exception an OccConflictException?
 
-    :type e: :py:class:`botocore.exceptions.ClientError`
-    :param e: The ClientError caught.
+    :type e: :py:class:`builtins.Exception`
+    :param e: The Exception caught.
 
     :rtype: bool
     :return: True if the exception is an OccConflictException. False otherwise.
     """
-    is_occ = e.response['Error']['Code'] == 'OccConflictException'
-    return is_occ
+    if isinstance(e, ClientError):
+        is_occ = e.response['Error']['Code'] == 'OccConflictException'
+        return is_occ
+    return False
 
 
 def is_bad_request_exception(e):
     """
     Is the exception a BadRequestException?
 
-    :type e: :py:class:`botocore.exceptions.ClientError`
-    :param e: The ClientError caught.
+    :type e: :py:class:`builtins.Exception`
+    :param e: The Exception caught.
 
     :rtype: bool
     :return: True if the exception is an BadRequestException. False otherwise.
     """
-    is_bad_request = e.response['Error']['Code'] == "BadRequestException"
-    return is_bad_request
+    if isinstance(e, ClientError):
+        is_bad_request = e.response['Error']['Code'] == "BadRequestException"
+        return is_bad_request
+    return False
 
 
 def is_invalid_session_exception(e):
     """
     Is the exception an InvalidSessionException?
 
-    :type e: :py:class:`botocore.exceptions.ClientError`
-    :param e: The ClientError caught.
+    :type e: :py:class:`builtins.Exception`
+    :param e: The Exception caught.
 
     :rtype: bool
     :return: True if the exception is an InvalidSessionException. False otherwise.
     """
-    is_invalid_session = e.response['Error']['Code'] == 'InvalidSessionException'
-    return is_invalid_session
+    if isinstance(e, ClientError):
+        is_invalid_session = e.response['Error']['Code'] == 'InvalidSessionException'
+        return is_invalid_session
+    return False
 
 
 def is_transaction_expired_exception(e):
     """
     Does this exception denote that a transaction has expired?
 
-    :type e: :py:class:`botocore.exceptions.ClientError`
-    :param e: The ClientError caught.
+    :type e: :py:class:`builtins.Exception`
+    :param e: The Exception caught.
 
     :rtype: bool
     :return: True if the exception denote that a transaction has expired. False otherwise.
     """
-    is_invalid_session = e.response['Error']['Code'] == 'InvalidSessionException'
+    # TODO CHECK IF THIS IS ClientError
+    if isinstance(e, ClientError):
+        is_invalid_session = e.response['Error']['Code'] == 'InvalidSessionException'
 
-    if "Message" in e.response["Error"]:
-        return is_invalid_session and re.search("Transaction .* has expired", e.response["Error"]["Message"])
-
+        if "Message" in e.response["Error"]:
+            return is_invalid_session and re.search("Transaction .* has expired", e.response["Error"]["Message"])
     return False
 
 
@@ -118,14 +137,21 @@ def is_retriable_exception(e):
     """
     Is the exception a retriable exception?
 
-    :type e: :py:class:`botocore.exceptions.ClientError`
-    :param e: The ClientError caught.
+    :type e: :py:class:`builtins.Exception`
+    :param e: The Exception caught.
 
     :rtype: bool
     :return: True if the exception is a retriable exception. False otherwise.
     """
-    is_retriable = e.response['ResponseMetadata']['HTTPStatusCode'] == 500 or \
-                   e.response['ResponseMetadata']['HTTPStatusCode'] == 503 or \
-                   e.response['Error']['Code'] == 'NoHttpResponseException' or \
-                   e.response['Error']['Code'] == 'SocketTimeoutException'
+
+    is_retriable = (isinstance(e, ClientError) and (e.response['ResponseMetadata']['HTTPStatusCode'] == 500 or
+                                                   e.response['ResponseMetadata']['HTTPStatusCode'] == 503 or
+                                                   e.response['Error']['Code'] == 'NoHttpResponseException' or
+                                                   e.response['Error']['Code'] == 'SocketTimeoutException')) or \
+                   isinstance(e, ReadTimeoutError) or \
+                   isinstance(e, EndpointConnectionError) or \
+                   isinstance(e, ConnectionClosedError) or \
+                   isinstance(e, ConnectTimeoutError) or \
+                   is_occ_conflict_exception(e) or \
+                   (is_invalid_session_exception(e) and not is_transaction_expired_exception(e))
     return is_retriable

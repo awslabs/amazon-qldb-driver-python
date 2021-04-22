@@ -11,13 +11,11 @@
 from logging import getLogger
 
 from amazon.ion.simpleion import dumps, loads
-from botocore.exceptions import ClientError
 
 from ..cursor.read_ahead_cursor import ReadAheadCursor
 from ..cursor.stream_cursor import StreamCursor
-from ..errors import IllegalStateError, TransactionClosedError, is_occ_conflict_exception
+from ..errors import IllegalStateError, TransactionClosedError
 from ..util.qldb_hash import QldbHash
-
 
 logger = getLogger(__name__)
 
@@ -66,18 +64,6 @@ class Transaction:
         self._txn_hash = QldbHash.to_qldb_hash(transaction_id)
         self._executor = executor
 
-    def __enter__(self):
-        """
-        Context Manager function to support the 'with' statement.
-        """
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """
-        Context Manager function to support the 'with' statement.
-        """
-        self._close()
-
     @property
     def is_closed(self):
         """
@@ -100,15 +86,6 @@ class Transaction:
             self._internal_close()
             self._session._abort_transaction()
 
-    def _close(self):
-        """
-        Close this transaction.
-        """
-        try:
-            self._abort()
-        except ClientError as ce:
-            logger.warning('Ignored error aborting transaction when closing: {}'.format(ce))
-
     def _commit(self):
         """
         Commit this transaction and close child cursors.
@@ -127,12 +104,6 @@ class Transaction:
             if self._txn_hash.get_qldb_hash() != commit_transaction_result.get('CommitDigest'):
                 raise IllegalStateError("Transaction's commit digest did not match returned value from QLDB. "
                                         "Please retry with a new transaction. Transaction ID: {}".format(self._id))
-        except ClientError as ce:
-            if is_occ_conflict_exception(ce):
-                # Avoid sending courtesy abort since we know transaction is dead on OCC conflict.
-                raise ce
-            self._close()
-            raise ce
         finally:
             self._internal_close()
 
