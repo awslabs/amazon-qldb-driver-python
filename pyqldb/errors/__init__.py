@@ -135,13 +135,13 @@ def is_transaction_expired_exception(e):
 
 def is_retriable_exception(e):
     """
-    Is the exception a retriable exception?
+    Is the exception a retryable exception?
 
     :type e: :py:class:`builtins.Exception`
     :param e: The Exception caught.
 
     :rtype: bool
-    :return: True if the exception is a retriable exception. False otherwise.
+    :return: True if the exception is a retryable exception. False otherwise.
     """
 
     is_retriable = (isinstance(e, ClientError) and (e.response['ResponseMetadata']['HTTPStatusCode'] == 500 or

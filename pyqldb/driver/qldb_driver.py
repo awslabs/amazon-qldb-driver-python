@@ -204,7 +204,7 @@ class QldbDriver:
     def execute_lambda(self, query_lambda, retry_config=None):
         """
         Execute the lambda function against QLDB within a transaction and retrieve the result. It will retry up to the
-        retry limit if an OCC conflict or retriable exception occurs.
+        retry limit if an OCC conflict or retryable exception occurs.
         This is the primary method to execute a transaction against Amazon QLDB ledger.
 
         :type query_lambda: function
@@ -284,7 +284,7 @@ class QldbDriver:
     def retry_limit(self):
         """
         The number of automatic retries for statement executions using convenience methods on sessions when
-        an OCC conflict or retriable exception occurs.
+        an OCC conflict or retryable exception occurs.
         """
         warn("The retry_limit property in QldbDriver class is deprecated. Please call RetryConfig's retry_limit "
              "property instead.", DeprecationWarning, stacklevel=2)
