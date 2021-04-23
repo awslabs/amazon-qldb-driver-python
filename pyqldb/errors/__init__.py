@@ -124,7 +124,6 @@ def is_transaction_expired_exception(e):
     :rtype: bool
     :return: True if the exception denote that a transaction has expired. False otherwise.
     """
-    # TODO CHECK IF THIS IS ClientError
     if isinstance(e, ClientError):
         is_invalid_session = e.response['Error']['Code'] == 'InvalidSessionException'
 

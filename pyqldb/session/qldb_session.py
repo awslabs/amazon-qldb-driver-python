@@ -12,11 +12,10 @@ from logging import getLogger
 
 from botocore.exceptions import ClientError
 
-from ..errors import ExecuteError, is_invalid_session_exception, is_occ_conflict_exception, \
-    is_transaction_expired_exception
 from ..cursor.buffered_cursor import BufferedCursor
 from ..cursor.stream_cursor import StreamCursor
-from ..errors import is_retriable_exception
+from ..errors import ExecuteError, is_invalid_session_exception, is_occ_conflict_exception, is_retriable_exception, \
+    is_transaction_expired_exception
 from ..execution.executor import Executor
 from ..transaction.transaction import Transaction
 

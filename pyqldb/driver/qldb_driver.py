@@ -23,9 +23,9 @@ from .. import __version__
 from ..communication.session_client import SessionClient
 
 from ..errors import ExecuteError, DriverClosedError, SessionPoolEmptyError
-from ..util.retry import Retry
 from ..session.qldb_session import QldbSession
 from ..util.atomic_integer import AtomicInteger
+from ..util.retry import Retry
 
 POOL_TIMEOUT_SECONDS = 0.001
 logger = getLogger(__name__)
@@ -284,7 +284,7 @@ class QldbDriver:
     def retry_limit(self):
         """
         The number of automatic retries for statement executions using convenience methods on sessions when
-        an OCC conflict or retryable exception occurs.
+        an OCC conflict or retriable exception occurs.
         """
         warn("The retry_limit property in QldbDriver class is deprecated. Please call RetryConfig's retry_limit "
              "property instead.", DeprecationWarning, stacklevel=2)
@@ -320,6 +320,8 @@ class QldbDriver:
 
         :rtype: :py:class:`pyqldb.session.qldb_session.QldbSession`
         :return: A QldbSession object.
+
+        :raises ExecuteError: Error containing the context of a failure during start new session.
 
         :raises SessionPoolEmptyError: If the timeout is reached while attempting to retrieve a session.
 
