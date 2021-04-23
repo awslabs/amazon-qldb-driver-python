@@ -11,6 +11,7 @@
 from queue import Queue, Empty
 from logging import getLogger
 from threading import BoundedSemaphore
+from warnings import warn
 
 from boto3 import client
 from boto3.session import Session
@@ -269,6 +270,8 @@ class QldbDriver:
         The number of automatic retries for statement executions using convenience methods on sessions when
         an OCC conflict or retriable exception occurs.
         """
+        warn("The retry_limit property in QldbDriver class is deprecated since Pyqldb 3.0 and in 4.0 it will stop "
+             "working.", DeprecationWarning, stacklevel=2)
         return self._retry_config._retry_limit
 
     def _create_new_session(self):
