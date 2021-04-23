@@ -14,6 +14,9 @@ import re
 from botocore.exceptions import EndpointConnectionError, ClientError, ConnectionClosedError, ConnectTimeoutError, \
     ReadTimeoutError
 
+RETRYABLE_HTTP_ERRORS = (
+    ReadTimeoutError, EndpointConnectionError, ConnectionClosedError, ConnectTimeoutError
+)
 
 class IllegalStateError(Exception):
     pass
@@ -147,10 +150,7 @@ def is_retriable_exception(e):
                                                    e.response['ResponseMetadata']['HTTPStatusCode'] == 503 or
                                                    e.response['Error']['Code'] == 'NoHttpResponseException' or
                                                    e.response['Error']['Code'] == 'SocketTimeoutException')) or \
-                   isinstance(e, ReadTimeoutError) or \
-                   isinstance(e, EndpointConnectionError) or \
-                   isinstance(e, ConnectionClosedError) or \
-                   isinstance(e, ConnectTimeoutError) or \
+                   isinstance(e, RETRYABLE_HTTP_ERRORS) or \
                    is_occ_conflict_exception(e) or \
                    (is_invalid_session_exception(e) and not is_transaction_expired_exception(e))
     return is_retriable

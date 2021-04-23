@@ -336,7 +336,6 @@ class QldbDriver:
         if self._pool_permits.acquire(timeout=self._timeout):
             self._pool_permits_counter.decrement()
 
-            session = None
             try:
                 if not start_new_session:
                     try:
@@ -346,9 +345,8 @@ class QldbDriver:
                     except Empty:
                         pass
 
-                if start_new_session or session is None:
-                    logger.debug('Creating new session.')
-                    return self._create_new_session()
+                logger.debug('Creating new session.')
+                return self._create_new_session()
             except Exception as e:
                 raise ExecuteError(e, True, True)
         else:

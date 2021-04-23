@@ -128,9 +128,9 @@ class QldbSession:
             return result
         except Exception as e:
             is_retryable = is_retriable_exception(e)
-            is_ise = is_invalid_session_exception(e)
+            is_session_invalid = is_invalid_session_exception(e)
 
-            if is_invalid_session_exception(e) and not is_transaction_expired_exception(e):
+            if is_session_invalid is True and not is_transaction_expired_exception(e):
                 # Underlying session is dead on InvalidSessionException except for transaction expiry
                 self._is_alive = False
             elif not is_occ_conflict_exception(e):
@@ -139,7 +139,7 @@ class QldbSession:
 
             if transaction is not None:
                 transaction_id = transaction.transaction_id
-            raise ExecuteError(e, is_retryable, is_ise, transaction_id)
+            raise ExecuteError(e, is_retryable, is_session_invalid, transaction_id)
 
     def _start_transaction(self):
         """
