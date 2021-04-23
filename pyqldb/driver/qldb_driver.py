@@ -11,6 +11,7 @@
 from queue import Queue, Empty
 from logging import getLogger
 from threading import BoundedSemaphore
+from warnings import warn
 
 from boto3 import client
 from boto3.session import Session
@@ -253,7 +254,6 @@ class QldbDriver:
                 else:
                     raise ce
 
-
     @property
     def read_ahead(self):
         """
@@ -270,7 +270,9 @@ class QldbDriver:
         The number of automatic retries for statement executions using convenience methods on sessions when
         an OCC conflict or retriable exception occurs.
         """
-        return self._retry_limit
+        warn("The retry_limit property in QldbDriver class is deprecated. Please call RetryConfig's retry_limit "
+             "property instead.", DeprecationWarning, stacklevel=2)
+        return self._retry_config._retry_limit
 
     def _create_new_session(self):
         """

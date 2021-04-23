@@ -16,6 +16,7 @@ from botocore.exceptions import ClientError
 from botocore.config import Config
 from boto3.session import Session
 
+from pyqldb.config.retry_config import RetryConfig
 from pyqldb.driver.qldb_driver import QldbDriver, SERVICE_DESCRIPTION
 from pyqldb.errors import DriverClosedError
 from pyqldb.session.qldb_session import QldbSession
@@ -52,7 +53,7 @@ class TestQldbDriver(TestCase):
                                             aws_secret_access_key=None, aws_session_token=None,
                                             config=MOCK_CONFIG, endpoint_url=None, region_name=None, verify=None)
         self.assertEqual(qldb_driver._ledger_name, MOCK_LEDGER_NAME)
-        self.assertEqual(qldb_driver._retry_config.retry_limit, DEFAULT_RETRY_LIMIT)
+        self.assertEqual(qldb_driver.retry_limit, DEFAULT_RETRY_LIMIT)
         self.assertEqual(qldb_driver._retry_config.base, DEFAULT_BACKOFF_BASE)
         self.assertEqual(qldb_driver._read_ahead, DEFAULT_READ_AHEAD)
         self.assertEqual(qldb_driver._pool_permits, mock_bounded_semaphore)
@@ -90,7 +91,7 @@ class TestQldbDriver(TestCase):
                                             aws_secret_access_key=EMPTY_STRING, aws_session_token=EMPTY_STRING,
                                             config=MOCK_CONFIG)
         self.assertEqual(qldb_driver._ledger_name, MOCK_LEDGER_NAME)
-        self.assertEqual(qldb_driver._retry_config.retry_limit, DEFAULT_RETRY_LIMIT)
+        self.assertEqual(qldb_driver.retry_limit, DEFAULT_RETRY_LIMIT)
         self.assertEqual(qldb_driver._retry_config.base, DEFAULT_BACKOFF_BASE)
         self.assertEqual(qldb_driver._read_ahead, DEFAULT_READ_AHEAD)
         self.assertEqual(qldb_driver._pool_permits, mock_bounded_semaphore)
@@ -140,7 +141,7 @@ class TestQldbDriver(TestCase):
 
         qldb_driver = QldbDriver(MOCK_LEDGER_NAME)
         self.assertEqual(qldb_driver._ledger_name, MOCK_LEDGER_NAME)
-        self.assertEqual(qldb_driver._retry_config.retry_limit, DEFAULT_RETRY_LIMIT)
+        self.assertEqual(qldb_driver.retry_limit, DEFAULT_RETRY_LIMIT)
         self.assertEqual(qldb_driver._retry_config.base, DEFAULT_BACKOFF_BASE)
         self.assertEqual(qldb_driver._read_ahead, DEFAULT_READ_AHEAD)
         self.assertEqual(qldb_driver._pool_permits, mock_bounded_semaphore)
@@ -173,7 +174,7 @@ class TestQldbDriver(TestCase):
         qldb_driver = QldbDriver(MOCK_LEDGER_NAME, max_concurrent_transactions=new_max_concurrent_transactions)
 
         self.assertEqual(qldb_driver._ledger_name, MOCK_LEDGER_NAME)
-        self.assertEqual(qldb_driver._retry_config.retry_limit, DEFAULT_RETRY_LIMIT)
+        self.assertEqual(qldb_driver.retry_limit, DEFAULT_RETRY_LIMIT)
         self.assertEqual(qldb_driver._retry_config.base, DEFAULT_BACKOFF_BASE)
         self.assertEqual(qldb_driver._read_ahead, DEFAULT_READ_AHEAD)
         self.assertEqual(qldb_driver._pool_permits, mock_bounded_semaphore)
@@ -408,6 +409,12 @@ class TestQldbDriver(TestCase):
         mock_client.return_value = mock_client
         driver = QldbDriver(MOCK_LEDGER_NAME)
         self.assertEqual(driver.read_ahead, driver._read_ahead)
+
+    def test_get_retry_limit(self):
+        retry_limit = 4
+        retry_config = RetryConfig(retry_limit=retry_limit)
+        driver = QldbDriver(MOCK_LEDGER_NAME, retry_config=retry_config)
+        self.assertEqual(driver.retry_limit, retry_limit)
 
     @patch('pyqldb.driver.qldb_driver.client')
     @patch('pyqldb.driver.qldb_driver.QldbDriver.execute_lambda')
