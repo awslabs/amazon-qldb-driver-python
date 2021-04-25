@@ -19,7 +19,7 @@ from pyqldb.config.retry_config import RetryConfig
 from pyqldb.driver.qldb_driver import QldbDriver, SERVICE_DESCRIPTION
 from pyqldb.errors import DriverClosedError, ExecuteError, SessionPoolEmptyError
 
-from .helper_functions import check_execute_error
+from .helper_functions import assert_execute_error
 
 DEFAULT_SESSION_NAME = 'qldb-session'
 DEFAULT_MAX_CONCURRENT_TRANSACTIONS = 10
@@ -338,7 +338,7 @@ class TestQldbDriver(TestCase):
         with self.assertRaises(ExecuteError) as cm:
             qldb_driver._get_session(False)
 
-        check_execute_error(self, cm.exception, error, True, True, None)
+        assert_execute_error(self, cm.exception, error, True, True, None)
 
     @patch('pyqldb.driver.qldb_driver.logger.debug')
     @patch('pyqldb.driver.qldb_driver.BoundedSemaphore')

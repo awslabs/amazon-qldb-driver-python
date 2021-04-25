@@ -16,7 +16,7 @@ from pyqldb.config.retry_config import RetryConfig
 from pyqldb.errors import ExecuteError
 from pyqldb.session.qldb_session import QldbSession
 
-from .helper_functions import check_execute_error
+from .helper_functions import assert_execute_error
 
 MOCK_ERROR_CODE = '500'
 MOCK_ID = 'mock_id'
@@ -168,7 +168,7 @@ class TestQldbSession(TestCase):
         with self.assertRaises(ExecuteError) as cm:
             qldb_session._execute_lambda(mock_lambda)
 
-        check_execute_error(self, cm.exception, ce, True, False, mock_transaction.transaction_id)
+        assert_execute_error(self, cm.exception, ce, True, False, mock_transaction.transaction_id)
         mock_no_throw_abort.assert_called_once_with(mock_transaction)
         self.assertTrue(qldb_session._is_alive)
         mock_transaction._commit.assert_not_called()
@@ -199,7 +199,7 @@ class TestQldbSession(TestCase):
         with self.assertRaises(ExecuteError) as cm:
             qldb_session._execute_lambda(mock_lambda)
 
-        check_execute_error(self, cm.exception, ce, False, True, mock_transaction.transaction_id)
+        assert_execute_error(self, cm.exception, ce, False, True, mock_transaction.transaction_id)
         mock_no_throw_abort.assert_not_called()
         self.assertFalse(qldb_session._is_alive)
         mock_transaction._commit.assert_not_called()
@@ -233,7 +233,7 @@ class TestQldbSession(TestCase):
         with self.assertRaises(ExecuteError) as cm:
             qldb_session._execute_lambda(mock_lambda)
 
-        check_execute_error(self, cm.exception, ce, False, True, mock_transaction.transaction_id)
+        assert_execute_error(self, cm.exception, ce, False, True, mock_transaction.transaction_id)
         mock_no_throw_abort.assert_called_once_with(mock_transaction)
         self.assertTrue(qldb_session._is_alive)
         mock_transaction._commit.assert_not_called()
@@ -263,7 +263,7 @@ class TestQldbSession(TestCase):
         with self.assertRaises(ExecuteError) as cm:
             qldb_session._execute_lambda(mock_lambda)
 
-        check_execute_error(self, cm.exception, ce, False, False, mock_transaction.transaction_id)
+        assert_execute_error(self, cm.exception, ce, False, False, mock_transaction.transaction_id)
         mock_no_throw_abort.assert_not_called()
         mock_transaction._commit.assert_not_called()
 
@@ -293,7 +293,7 @@ class TestQldbSession(TestCase):
         with self.assertRaises(ExecuteError) as cm:
             qldb_session._execute_lambda(mock_lambda)
 
-        check_execute_error(self, cm.exception, error, False, False, mock_transaction.transaction_id)
+        assert_execute_error(self, cm.exception, error, False, False, mock_transaction.transaction_id)
         self.assertTrue(qldb_session._is_alive)
         mock_no_throw_abort.assert_called_once_with(mock_transaction)
         mock_transaction._commit.assert_not_called()

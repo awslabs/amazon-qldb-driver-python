@@ -71,7 +71,7 @@ def create_stream_cursor(mock_session, mock_statement_result_execute, mock_state
     return stream_cursor
 
 
-def check_execute_error(test_case, execute_error, expected_inner_error, expected_is_retryable,
+def assert_execute_error(test_case, execute_error, expected_inner_error, expected_is_retryable,
                         expected_is_invalid_session, expected_transaction_id):
     test_case.assertEqual(execute_error.error, expected_inner_error)
     test_case.assertEqual(execute_error.is_retryable, expected_is_retryable)

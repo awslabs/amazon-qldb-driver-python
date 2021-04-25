@@ -314,7 +314,7 @@ class QldbDriver:
 
         :type start_new_session: bool
         :param start_new_session: A boolean value to determine whether to start a new session or retrieve a session from
-                                   the session pool.
+                                  the session pool.
 
         :rtype: :py:class:`pyqldb.session.qldb_session.QldbSession`
         :return: A QldbSession object.
