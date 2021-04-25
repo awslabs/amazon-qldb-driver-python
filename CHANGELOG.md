@@ -1,4 +1,3 @@
-
 ### Release 3.2.0
 This release is focused on improving the retry logic, optimizing it and handling more possible failures.
 
