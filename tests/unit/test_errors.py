@@ -9,7 +9,8 @@
 # CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
 # and limitations under the License.
 from unittest import TestCase
-from unittest.mock import patch
+
+from botocore.exceptions import ClientError
 
 from pyqldb.errors import is_occ_conflict_exception, is_invalid_session_exception, is_retriable_exception, \
     is_bad_request_exception, is_transaction_expired_exception
@@ -17,75 +18,92 @@ from pyqldb.errors import is_occ_conflict_exception, is_invalid_session_exceptio
 
 class TestErrors(TestCase):
 
-    @patch('botocore.exceptions.ClientError')
-    def test_is_bad_request_exception_true(self, mock_client_error):
-        mock_client_error.response = {'Error': {'Code': 'BadRequestException'}}
-        self.assertTrue(is_bad_request_exception(mock_client_error))
+    def test_is_bad_request_exception_true(self):
+        clientError = ClientError({'Error': {'Code': 'BadRequestException'}}, 'SendCommand')
+        self.assertTrue(is_bad_request_exception(clientError))
 
-    @patch('botocore.exceptions.ClientError')
-    def test_is_bad_request_exception_false(self, mock_client_error):
-        mock_client_error.response = {'Error': {'Code': 'NotBadRequestException'}}
-        self.assertFalse(is_bad_request_exception(mock_client_error))
+    def test_is_bad_request_exception_false(self):
+        clientError = ClientError({'Error': {'Code': 'NotBadRequestException'}}, 'SendCommand')
+        self.assertFalse(is_bad_request_exception(clientError))
 
+    def test_is_bad_request_exception_not_client_error(self):
+        self.assertFalse(is_bad_request_exception(Exception()))
 
-    @patch('botocore.exceptions.ClientError')
-    def test_is_transaction_expired_exception(self, mock_client_error):
-        mock_client_error.response = {'Error': {'Code': 'InvalidSessionException',
-                                                'Message': 'Transaction xyz has expired'}}
-        self.assertTrue(is_transaction_expired_exception(mock_client_error))
+    def test_is_transaction_expired_exception_true(self):
+        clientError = ClientError({'Error': {'Code': 'InvalidSessionException',
+                                             'Message': 'Transaction xyz has expired'}}, 'SendCommand')
+        self.assertTrue(is_transaction_expired_exception(clientError))
 
-    @patch('botocore.exceptions.ClientError')
-    def test_is_bad_request_exception_false(self, mock_client_error):
-        mock_client_error.response = {'Error': {'Code': 'InvalidSessionException',
-                                                'Message': 'Transaction xyz has not expired'}}
-        self.assertFalse(is_transaction_expired_exception(mock_client_error))
+    def test_is_transaction_expired_exception_false(self):
+        clientError = ClientError({'Error': {'Code': 'InvalidSessionException',
+                                             'Message': 'Transaction xyz has not expired'}}, 'SendCommand')
+        self.assertFalse(is_transaction_expired_exception(clientError))
 
-    @patch('botocore.exceptions.ClientError')
-    def test_is_occ_conflict_exception_true(self, mock_client_error):
-        mock_client_error.response = {'Error': {'Code': 'OccConflictException'}}
-        self.assertTrue(is_occ_conflict_exception(mock_client_error))
+    def test_is_transaction_expired_exception_not_client_error(self):
+        self.assertFalse(is_transaction_expired_exception(Exception()))
 
-    @patch('botocore.exceptions.ClientError')
-    def test_is_occ_conflict_exception_false(self, mock_client_error):
-        mock_client_error.response = {'Error': {'Code': 'NotOccConflictException'}}
-        self.assertFalse(is_occ_conflict_exception(mock_client_error))
+    def test_is_occ_conflict_exception_true(self):
+        clientError = ClientError({'Error': {'Code': 'OccConflictException'}}, 'SendCommand')
+        self.assertTrue(is_occ_conflict_exception(clientError))
 
-    @patch('botocore.exceptions.ClientError')
-    def test_is_invalid_session_true(self, mock_client_error):
-        mock_client_error.response = {'Error': {'Code': 'InvalidSessionException'}}
-        self.assertTrue(is_invalid_session_exception(mock_client_error))
+    def test_is_occ_conflict_exception_false(self):
+        clientError = ClientError({'Error': {'Code': 'NotOccConflictException'}}, 'SendCommand')
+        self.assertFalse(is_occ_conflict_exception(clientError))
 
-    @patch('botocore.exceptions.ClientError')
-    def test_is_invalid_session_false(self, mock_client_error):
-        mock_client_error.response = {'Error': {'Code': 'NotInvalidSessionException'}}
-        self.assertFalse(is_invalid_session_exception(mock_client_error))
+    def test_is_occ_conflict_exception_not_client_error(self):
+        self.assertFalse(is_occ_conflict_exception(Exception()))
 
-    @patch('botocore.exceptions.ClientError')
-    def test_is_retriable_exception_is_500_response_code(self, mock_client_error):
-        mock_client_error.response = {'ResponseMetadata': {'HTTPStatusCode': 500},
-                                      'Error': {'Code': 'NotRetriableException'}}
-        self.assertTrue(is_retriable_exception(mock_client_error))
+    def test_is_invalid_session_true(self):
+        clientError = ClientError({'Error': {'Code': 'InvalidSessionException'}}, 'SendCommand')
+        self.assertTrue(is_invalid_session_exception(clientError))
 
-    @patch('botocore.exceptions.ClientError')
-    def test_is_retriable_exception_is_503_response_code(self, mock_client_error):
-        mock_client_error.response = {'ResponseMetadata': {'HTTPStatusCode': 503},
-                                      'Error': {'Code': 'NotRetriableException'}}
-        self.assertTrue(is_retriable_exception(mock_client_error))
+    def test_is_invalid_session_false(self):
+        clientError = ClientError({'Error': {'Code': 'NotInvalidSessionException'}}, 'SendCommand')
+        self.assertFalse(is_invalid_session_exception(clientError))
 
-    @patch('botocore.exceptions.ClientError')
-    def test_is_retriable_exception_is_NoHttpResponseException(self, mock_client_error):
-        mock_client_error.response = {'Error': {'Code': 'NoHttpResponseException'},
-                                      'ResponseMetadata': {'HTTPStatusCode': 200}}
-        self.assertTrue(is_retriable_exception(mock_client_error))
+    def test_is_invalid_session_not_client_error(self):
+        self.assertFalse(is_invalid_session_exception(Exception()))
 
-    @patch('botocore.exceptions.ClientError')
-    def test_is_retriable_exception_is_SocketTimeoutException(self, mock_client_error):
-        mock_client_error.response = {'Error': {'Code': 'SocketTimeoutException'},
-                                      'ResponseMetadata': {'HTTPStatusCode': 200}}
-        self.assertTrue(is_retriable_exception(mock_client_error))
+    def test_is_retryable_exception_is_500_response_code(self):
+        clientError = ClientError({'ResponseMetadata': {'HTTPStatusCode': 500},
+                                   'Error': {'Code': 'RetryableException'}}, 'SendCommand')
+        self.assertTrue(is_retriable_exception(clientError))
 
-    @patch('botocore.exceptions.ClientError')
-    def test_is_retriable_exception_false(self, mock_client_error):
-        mock_client_error.response = {'Error': {'Code': 'NotRetriableException'},
-                                      'ResponseMetadata': {'HTTPStatusCode': 200}}
-        self.assertFalse(is_retriable_exception(mock_client_error))
+    def test_is_retryable_exception_is_503_response_code(self):
+        clientError = ClientError({'ResponseMetadata': {'HTTPStatusCode': 503},
+                                   'Error': {'Code': 'RetryableException'}}, 'SendCommand')
+        self.assertTrue(is_retriable_exception(clientError))
+
+    def test_is_retryable_exception_is_NoHttpResponseException(self):
+        clientError = ClientError({'Error': {'Code': 'NoHttpResponseException'},
+                                   'ResponseMetadata': {'HTTPStatusCode': 200}}, 'SendCommand')
+        self.assertTrue(is_retriable_exception(clientError))
+
+    def test_is_retryable_exception_is_SocketTimeoutException(self):
+        clientError = ClientError({'Error': {'Code': 'SocketTimeoutException'},
+                                   'ResponseMetadata': {'HTTPStatusCode': 200}}, 'SendCommand')
+        self.assertTrue(is_retriable_exception(clientError))
+
+    def test_is_retryable_exception_is_occ_conflict_exception(self):
+        clientError = ClientError({'Error': {'Code': 'OccConflictException'},
+                                   'ResponseMetadata': {'HTTPStatusCode': 100}}, 'SendCommand')
+        self.assertTrue(is_retriable_exception(clientError))
+
+    def test_is_retryable_exception_is_invalid_session_exception(self):
+        clientError = ClientError({'Error': {'Code': 'InvalidSessionException'},
+                                   'ResponseMetadata': {'HTTPStatusCode': 100}}, 'SendCommand')
+        self.assertTrue(is_retriable_exception(clientError))
+
+    def test_is_retryable_exception_is_expired_transaction_exception(self):
+        clientError = ClientError({'Error': {'Code': 'InvalidSessionException',
+                                             'Message': 'Transaction xyz has expired'},
+                                   'ResponseMetadata': {'HTTPStatusCode': 100}}, 'SendCommand')
+        self.assertFalse(is_retriable_exception(clientError))
+
+    def test_is_retryable_exception_false(self):
+        clientError = ClientError({'Error': {'Code': 'NotRetriableException'},
+                                   'ResponseMetadata': {'HTTPStatusCode': 200}}, 'SendCommand')
+        self.assertFalse(is_retriable_exception(clientError))
+
+    def test_is_retryable_exception_not_client_exception(self):
+        self.assertFalse(is_retriable_exception(Exception()))
