@@ -21,7 +21,6 @@ from pyqldb.config.retry_config import RetryConfig
 
 from .. import __version__
 from ..communication.session_client import SessionClient
-
 from ..errors import ExecuteError, DriverClosedError, SessionPoolEmptyError
 from ..session.qldb_session import QldbSession
 from ..util.atomic_integer import AtomicInteger

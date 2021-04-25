@@ -18,6 +18,7 @@ RETRYABLE_HTTP_ERRORS = (
     ReadTimeoutError, EndpointConnectionError, ConnectionClosedError, ConnectTimeoutError
 )
 
+
 class IllegalStateError(Exception):
     pass
 
@@ -62,7 +63,7 @@ class StartTransactionError(Exception):
 
 class ExecuteError(Exception):
     def __init__(self, error, is_retryable, is_invalid_session_exception, transaction_id=None):
-        super().__init__('Error containing the context of a failure during execute')
+        super().__init__('Error containing the context of a failure during execute.')
         self.error = error
         self.is_retryable = is_retryable
         self.is_invalid_session_exception = is_invalid_session_exception
