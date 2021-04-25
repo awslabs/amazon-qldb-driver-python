@@ -19,7 +19,7 @@ class Executable(ABC):
     def execute_statement(self, statement, *parameters, retry_indicator):
         """
         Implicitly start a transaction, execute the statement, and commit the transaction, retrying up to the
-        retry limit if an OCC conflict or retryable exception occurs. This method must be overridden.
+        retry limit if an OCC conflict or retriable exception occurs. This method must be overridden.
         """
         pass
 
@@ -27,6 +27,6 @@ class Executable(ABC):
     def execute_lambda(self, query_lambda, retry_indicator):
         """
         Implicitly start a transaction, execute the lambda function, and commit the transaction, retrying up to the
-        retry limit if an OCC conflict or retryable exception occurs. This method must be overridden.
+        retry limit if an OCC conflict or retriable exception occurs. This method must be overridden.
         """
         pass

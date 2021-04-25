@@ -8,8 +8,11 @@
 # or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
 # CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
 # and limitations under the License.
+
 from logging import getLogger
 
+from amazon.ion.simple_types import IonPyBool, IonPyBytes, IonPyDecimal, IonPyDict, IonPyFloat, IonPyInt, IonPyList, \
+    IonPyNull, IonPySymbol, IonPyText, IonPyTimestamp
 from amazon.ion.simpleion import dumps
 from botocore.exceptions import ClientError
 

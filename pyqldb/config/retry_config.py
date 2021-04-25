@@ -17,7 +17,7 @@ class RetryConfig:
     :type retry_limit: int
     :param retry_limit: The number of automatic retries for statement executions
                         using :py:meth:`pyqldb.driver.qldb_driver.QldbDriver.execute_lambda`
-                        when an OCC conflict or retryable exception occurs. This value must not be negative.
+                        when an OCC conflict or retriable exception occurs. This value must not be negative.
 
     :type base: int
     :param base: The base number of milliseconds to use in the exponential backoff for operation retries.
@@ -44,7 +44,7 @@ class RetryConfig:
         """
         The number of automatic retries for statement executions using
         :py:meth:`pyqldb.driver.qldb_driver.QldbDriver.execute_lambda` when an OCC conflict or
-        retryable exception occurs. This value must not be negative.
+        retriable exception occurs. This value must not be negative.
         """
         return self._retry_limit
 
