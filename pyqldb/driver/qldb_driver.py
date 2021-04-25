@@ -239,24 +239,23 @@ class QldbDriver:
 
         start_new_session = False
         session = None
-        retry_attempt = 1
+        retry_attempt = 0
 
         while True:
             try:
+                retry_attempt += 1
                 with self._get_session(start_new_session) as session:
                     return session._execute_lambda(query_lambda)
             except Exception as e:
                 if isinstance(e, ExecuteError):
-                    if e.is_retryable is True:
+                    if e.is_retryable:
                         # Always retry on the first attempt if failure was caused by a stale session in the pool
                         if retry_attempt == 1 and e.is_invalid_session_exception:
-                            retry_attempt += 1
                             continue
 
                         if retry_attempt > retry_config.retry_limit:
                             raise e.error
 
-                        retry_attempt += 1
                         self._retry_sleep(retry_config, retry_attempt, e.error, e.transaction_id)
                         logger.info('A recoverable error has occurred. Attempting retry #{}'.format(retry_attempt))
                         logger.debug('Error cause: {}'.format(e.error))

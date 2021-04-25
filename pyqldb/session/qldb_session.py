@@ -130,7 +130,7 @@ class QldbSession:
             is_retryable = is_retriable_exception(e)
             is_session_invalid = is_invalid_session_exception(e)
 
-            if is_session_invalid is True and not is_transaction_expired_exception(e):
+            if is_session_invalid and not is_transaction_expired_exception(e):
                 # Underlying session is dead on InvalidSessionException except for transaction expiry
                 self._is_alive = False
             elif not is_occ_conflict_exception(e):
