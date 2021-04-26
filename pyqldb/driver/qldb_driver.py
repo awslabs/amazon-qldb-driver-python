@@ -17,9 +17,9 @@ from time import sleep
 from boto3 import client
 from boto3.session import Session
 from botocore.config import Config
-from pyqldb.config.retry_config import RetryConfig
 
 from .. import __version__
+from ..config.retry_config import RetryConfig
 from ..communication.session_client import SessionClient
 from ..errors import ExecuteError, DriverClosedError, SessionPoolEmptyError
 from ..session.qldb_session import QldbSession
