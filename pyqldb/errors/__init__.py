@@ -147,11 +147,11 @@ def is_retriable_exception(e):
     :return: True if the exception is a retryable exception. False otherwise.
     """
 
-    is_retriable = (isinstance(e, ClientError) and (e.response['ResponseMetadata']['HTTPStatusCode'] == 500 or
+    is_retryable = (isinstance(e, ClientError) and (e.response['ResponseMetadata']['HTTPStatusCode'] == 500 or
                                                     e.response['ResponseMetadata']['HTTPStatusCode'] == 503 or
                                                     e.response['Error']['Code'] == 'NoHttpResponseException' or
                                                     e.response['Error']['Code'] == 'SocketTimeoutException')) or \
                    isinstance(e, RETRYABLE_HTTP_ERRORS) or \
                    is_occ_conflict_exception(e) or \
                    (is_invalid_session_exception(e) and not is_transaction_expired_exception(e))
-    return is_retriable
+    return is_retryable
