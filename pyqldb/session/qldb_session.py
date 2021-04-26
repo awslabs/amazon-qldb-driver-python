@@ -131,10 +131,10 @@ class QldbSession:
             is_session_invalid = is_invalid_session_exception(e)
 
             if is_session_invalid and not is_transaction_expired_exception(e):
-                # Underlying session is dead on InvalidSessionException except for transaction expiry
+                # Underlying session is dead on InvalidSessionException except for transaction expiry.
                 self._is_alive = False
             elif not is_occ_conflict_exception(e):
-                # OCC does not need session state reset as the transaction is implicitly closed
+                # OCC does not need session state reset as the transaction is implicitly closed.
                 self._no_throw_abort(transaction)
 
             if transaction is not None:

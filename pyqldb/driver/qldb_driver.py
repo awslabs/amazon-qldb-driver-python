@@ -10,17 +10,17 @@
 # and limitations under the License.
 from queue import Queue, Empty
 from logging import getLogger
+from time import sleep
 from threading import BoundedSemaphore
 from warnings import warn
-from time import sleep
 
 from boto3 import client
 from boto3.session import Session
 from botocore.config import Config
 
 from .. import __version__
-from ..config.retry_config import RetryConfig
 from ..communication.session_client import SessionClient
+from ..config.retry_config import RetryConfig
 from ..errors import ExecuteError, DriverClosedError, SessionPoolEmptyError
 from ..session.qldb_session import QldbSession
 from ..util.atomic_integer import AtomicInteger
@@ -248,7 +248,7 @@ class QldbDriver:
             except Exception as e:
                 if isinstance(e, ExecuteError):
                     if e.is_retryable:
-                        # Always retry on the first attempt if failure was caused by a stale session in the pool
+                        # Always retry on the first attempt if failure was caused by a stale session in the pool.
                         if retry_attempt == 1 and e.is_invalid_session_exception:
                             continue
 
