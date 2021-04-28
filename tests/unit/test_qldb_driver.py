@@ -326,9 +326,11 @@ class TestQldbDriver(TestCase):
         self.assertEqual(mock_logger_debug.call_count, 2)
         mock_create_new_session.assert_called_once_with()
 
+    @patch('pyqldb.driver.qldb_driver.AtomicInteger')
+    @patch('pyqldb.driver.qldb_driver.BoundedSemaphore')
     @patch('pyqldb.driver.qldb_driver.QldbDriver._create_new_session')
     @patch('pyqldb.driver.qldb_driver.client')
-    def test_get_session_exception(self, mock_client, mock_create_new_session):
+    def test_get_session_exception(self, mock_client, mock_create_new_session, mock_bounded_semaphore, mock_atomic_integer):
         mock_client.return_value = mock_client
         mock_client.max_pool_connections = DEFAULT_MAX_CONCURRENT_TRANSACTIONS
         error = KeyError()
@@ -339,11 +341,15 @@ class TestQldbDriver(TestCase):
             qldb_driver._get_session(False)
 
         assert_execute_error(self, cm.exception, error, True, True, None)
+        mock_bounded_semaphore().release.assert_called_once_with()
+        mock_atomic_integer().increment.assert_called_once_with()
 
+    @patch('pyqldb.driver.qldb_driver.AtomicInteger')
     @patch('pyqldb.driver.qldb_driver.logger.debug')
     @patch('pyqldb.driver.qldb_driver.BoundedSemaphore')
     @patch('pyqldb.driver.qldb_driver.client')
-    def test_get_session_session_pool_empty_error(self, mock_client, mock_bounded_semaphore, mock_logger_debug):
+    def test_get_session_session_pool_empty_error(self, mock_client, mock_bounded_semaphore, mock_logger_debug,
+                                                  mock_atomic_integer):
         mock_client.return_value = mock_client
         mock_client.max_pool_connections = DEFAULT_MAX_CONCURRENT_TRANSACTIONS
         mock_bounded_semaphore().acquire.return_value = False
@@ -351,15 +357,8 @@ class TestQldbDriver(TestCase):
 
         self.assertRaises(SessionPoolEmptyError, qldb_driver._get_session, True)
         mock_logger_debug.assert_called_once()
-
-    @patch('pyqldb.driver.qldb_driver.client')
-    def test_get_session_when_closed(self, mock_client):
-        mock_client.return_value = mock_client
-        mock_client.max_pool_connections = DEFAULT_MAX_CONCURRENT_TRANSACTIONS
-        qldb_driver = QldbDriver(MOCK_LEDGER_NAME)
-        qldb_driver._is_closed = True
-
-        self.assertRaises(DriverClosedError, qldb_driver._get_session, True)
+        mock_bounded_semaphore().release.assert_not_called()
+        mock_atomic_integer().increment.assert_not_called()
 
     @patch('pyqldb.driver.qldb_driver.QldbSession')
     @patch('pyqldb.communication.session_client.SessionClient._start_session')
@@ -418,19 +417,15 @@ class TestQldbDriver(TestCase):
     @patch('pyqldb.driver.qldb_driver.AtomicInteger')
     @patch('pyqldb.driver.qldb_driver.BoundedSemaphore')
     @patch('pyqldb.driver.qldb_driver.Queue')
-    @patch('pyqldb.driver.qldb_driver.logger.debug')
     @patch('pyqldb.driver.qldb_driver.client')
-    def test_release_session_for_none_session(self, mock_client, mock_logger_debug, mock_queue, mock_bounded_semaphore,
+    def test_release_session_for_none_session(self, mock_client, mock_queue, mock_bounded_semaphore,
                                               mock_atomic_integer):
         mock_client.return_value = mock_client
-        mock_client.max_pool_connections = DEFAULT_MAX_CONCURRENT_TRANSACTIONS
         qldb_driver = QldbDriver(MOCK_LEDGER_NAME)
         self.assertFalse(qldb_driver._release_session(None))
-
-        mock_queue().put.assert_not_called()
-        mock_bounded_semaphore().release.assert_called_once_with()
-        mock_atomic_integer().increment.assert_called_once_with()
-        mock_logger_debug.assert_called_once()
+        mock_queue.put.assert_not_called()
+        mock_bounded_semaphore().release.assert_not_called()
+        mock_atomic_integer().increment.assert_not_called()
 
     @patch('pyqldb.driver.qldb_driver.client')
     def test_get_read_ahead(self, mock_client):
@@ -475,6 +470,15 @@ class TestQldbDriver(TestCase):
         mock_get_session.assert_called_once_with(False)
         mock_session._execute_lambda.assert_called_once_with(mock_lambda)
         self.assertEqual(result, MOCK_MESSAGE)
+
+    @patch('pyqldb.driver.qldb_driver.client')
+    def test_execute_lambda_when_driver_is_closed(self, mock_client):
+        mock_client.return_value = mock_client
+        mock_lambda = Mock()
+
+        driver = QldbDriver(MOCK_LEDGER_NAME)
+        driver._is_closed = True
+        self.assertRaises(DriverClosedError, driver.execute_lambda, mock_lambda)
 
     @patch('pyqldb.driver.qldb_driver.QldbDriver._release_session')
     @patch('pyqldb.communication.session_client.SessionClient')

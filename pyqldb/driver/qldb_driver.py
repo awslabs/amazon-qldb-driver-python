@@ -237,6 +237,9 @@ class QldbDriver:
 
         :raises LambdaAbortedError: If the lambda function calls :py:class:`pyqldb.execution.executor.Executor.abort`.
         """
+        if self._is_closed:
+            raise DriverClosedError
+
         retry_config = self._retry_config if retry_config is None else retry_config
 
         start_new_session = False
@@ -299,15 +302,15 @@ class QldbDriver:
         """
         Release a session back into the pool.
         """
-        self._pool_permits.release()
-        self._pool_permits_counter.increment()
-        logger.debug('Number of sessions in pool : {}'.format(self._pool.qsize()))
+        if session:
+            self._pool_permits.release()
+            self._pool_permits_counter.increment()
+            logger.debug('Number of sessions in pool : {}'.format(self._pool.qsize()))
 
-        if session is not None and session._is_alive:
-            self._pool.put(session)
-            return True
-        else:
-            return False
+            if session._is_alive:
+                self._pool.put(session)
+                return True
+        return False
 
     def _get_session(self, start_new_session):
         """
@@ -325,12 +328,7 @@ class QldbDriver:
         :raises ExecuteError: Error containing the context of a failure during start new session.
 
         :raises SessionPoolEmptyError: If the timeout is reached while attempting to retrieve a session.
-
-        :raises DriverClosedError: When this driver is closed.
         """
-        if self._is_closed:
-            raise DriverClosedError
-
         logger.debug('Getting session. Current free session count: {}. Current available permit count: {}.'.format(
             self._pool.qsize(), self._pool_permits_counter.value))
 
@@ -349,6 +347,8 @@ class QldbDriver:
                 logger.debug('Creating new session.')
                 return self._create_new_session()
             except Exception as e:
+                self._pool_permits.release()
+                self._pool_permits_counter.increment()
                 raise ExecuteError(e, True, True)
         else:
             raise SessionPoolEmptyError(self._timeout)
