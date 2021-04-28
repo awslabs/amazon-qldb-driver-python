@@ -46,29 +46,13 @@ class QldbSession:
 
     :type executor: :py:class:`concurrent.futures.thread.ThreadPoolExecutor`
     :param executor: The executor to be used by the retrieval thread.
-
-    :type return_session_to_pool: :function
-    :param return_session_to_pool: A callback that describes how the session will be returned to the pool.
     """
 
-    def __init__(self, session, read_ahead, executor, return_session_to_pool):
+    def __init__(self, session, read_ahead, executor):
         self._is_alive = True
         self._read_ahead = read_ahead
         self._executor = executor
         self._session = session
-        self._return_session_to_pool = return_session_to_pool
-
-    def __enter__(self):
-        """
-        Context Manager function to support the 'with' statement.
-        """
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """
-        Context Manager function to support the 'with' statement.
-        """
-        self._release()
 
     @property
     def ledger_name(self):
@@ -135,11 +119,14 @@ class QldbSession:
                 self._is_alive = False
             elif not is_occ_conflict_exception(e):
                 # OCC does not need session state reset as the transaction is implicitly closed.
-                self._no_throw_abort(transaction)
+                self._no_throw_abort()
 
             if transaction is not None:
                 transaction_id = transaction.transaction_id
             raise ExecuteError(e, is_retryable, is_session_invalid, transaction_id)
+        finally:
+            if transaction is not None:
+                transaction._close_child_cursors()
 
     def _start_transaction(self):
         """
@@ -152,21 +139,12 @@ class QldbSession:
         transaction = Transaction(self._session, self._read_ahead, transaction_id, self._executor)
         return transaction
 
-    def _no_throw_abort(self, transaction):
+    def _no_throw_abort(self):
         """
         Send an abort request which will not throw on failure.
         """
         try:
-            if transaction is None:
-                self._session._abort_transaction()
-            else:
-                transaction._abort()
+            self._session._abort_transaction()
         except ClientError as ce:
             self._is_alive = False
             logger.warning('Ignored error aborting transaction during execution: {}'.format(ce))
-
-    def _release(self):
-        """
-        Return this `QldbSession` to the pool.
-        """
-        self._return_session_to_pool(self)

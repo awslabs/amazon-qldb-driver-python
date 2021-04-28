@@ -181,9 +181,12 @@ class QldbDriver:
         Close the driver and any sessions in the pool.
         """
         self._is_closed = True
-        while not self._pool.empty():
-            cur_session = self._pool.get_nowait()
-            cur_session._end_session()
+        while True:
+            try:
+                cur_session = self._pool.get_nowait()
+                cur_session._end_session()
+            except Empty:
+                return
 
     def list_tables(self):
         """
@@ -243,8 +246,8 @@ class QldbDriver:
         while True:
             try:
                 retry_attempt += 1
-                with self._get_session(start_new_session) as session:
-                    return session._execute_lambda(query_lambda)
+                session = self._get_session(start_new_session)
+                return session._execute_lambda(query_lambda)
             except Exception as e:
                 if isinstance(e, ExecuteError):
                     if e.is_retryable:
@@ -263,10 +266,7 @@ class QldbDriver:
                 else:
                     raise e
             finally:
-                if session is not None and session._is_alive:
-                    start_new_session = False
-                else:
-                    start_new_session = True
+                start_new_session = not self._release_session(session)
 
     @property
     def read_ahead(self):
@@ -293,7 +293,7 @@ class QldbDriver:
         Create a new QldbSession object.
         """
         session_client = SessionClient._start_session(self._ledger_name, self._client)
-        return QldbSession(session_client, self._read_ahead, self._executor, self._release_session)
+        return QldbSession(session_client, self._read_ahead, self._executor)
 
     def _release_session(self, session):
         """
@@ -305,6 +305,9 @@ class QldbDriver:
 
         if session is not None and session._is_alive:
             self._pool.put(session)
+            return True
+        else:
+            return False
 
     def _get_session(self, start_new_session):
         """

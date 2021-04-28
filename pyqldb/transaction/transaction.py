@@ -61,28 +61,18 @@ class Transaction:
         """
         return self._id
 
-    def _abort(self):
-        """
-        Abort this transaction and close child cursors.
-        """
-        self._close_child_cursors()
-        self._session._abort_transaction()
-
     def _commit(self):
         """
-        Commit this transaction and close child cursors.
+        Commit this transaction.
 
         :raises IllegalStateError: When the commit digest from commit transaction result does not match.
 
         :raises ClientError: When there is an error communicating against QLDB.
         """
-        try:
-            commit_transaction_result = self._session._commit_transaction(self._id, self._txn_hash.get_qldb_hash())
-            if self._txn_hash.get_qldb_hash() != commit_transaction_result.get('CommitDigest'):
-                raise IllegalStateError("Transaction's commit digest did not match returned value from QLDB. "
-                                        "Please retry with a new transaction. Transaction ID: {}".format(self._id))
-        finally:
-            self._close_child_cursors()
+        commit_transaction_result = self._session._commit_transaction(self._id, self._txn_hash.get_qldb_hash())
+        if self._txn_hash.get_qldb_hash() != commit_transaction_result.get('CommitDigest'):
+            raise IllegalStateError("Transaction's commit digest did not match returned value from QLDB. "
+                                    "Please retry with a new transaction. Transaction ID: {}".format(self._id))
 
     def _execute_statement(self, statement, *parameters):
         """

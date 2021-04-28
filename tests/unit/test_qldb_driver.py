@@ -75,8 +75,8 @@ class TestQldbDriver(TestCase):
     @patch('pyqldb.driver.qldb_driver.AtomicInteger')
     @patch('pyqldb.driver.qldb_driver.BoundedSemaphore')
     @patch('pyqldb.driver.qldb_driver.client')
-    def test_default_constructor_with_parameters(self, mock_client, mock_bounded_semaphore,
-                                                 mock_atomic_integer, mock_queue):
+    def test_default_constructor_with_parameters(self, mock_client, mock_bounded_semaphore, mock_atomic_integer,
+                                                 mock_queue):
         mock_queue.return_value = mock_queue
         mock_atomic_integer.return_value = mock_atomic_integer
         mock_bounded_semaphore.return_value = mock_bounded_semaphore
@@ -361,11 +361,10 @@ class TestQldbDriver(TestCase):
 
         self.assertRaises(DriverClosedError, qldb_driver._get_session, True)
 
-    @patch('pyqldb.driver.qldb_driver.QldbDriver._release_session')
     @patch('pyqldb.driver.qldb_driver.QldbSession')
     @patch('pyqldb.communication.session_client.SessionClient._start_session')
     @patch('pyqldb.driver.qldb_driver.client')
-    def test_create_new_session(self, mock_client, mock_session_start_session, mock_qldb_session, mock_release_session):
+    def test_create_new_session(self, mock_client, mock_session_start_session, mock_qldb_session):
         mock_session_start_session.return_value = mock_session_start_session
         mock_qldb_session.return_value = mock_qldb_session
         mock_client.return_value = mock_client
@@ -374,8 +373,8 @@ class TestQldbDriver(TestCase):
         session = qldb_driver._create_new_session()
 
         mock_session_start_session.assert_called_once_with(MOCK_LEDGER_NAME, qldb_driver._client)
-        mock_qldb_session.assert_called_once_with(mock_session_start_session,
-                                                  qldb_driver._read_ahead, qldb_driver._executor, mock_release_session)
+        mock_qldb_session.assert_called_once_with(mock_session_start_session, qldb_driver._read_ahead,
+                                                  qldb_driver._executor)
         self.assertEqual(session, mock_qldb_session)
 
     @patch('pyqldb.driver.qldb_driver.AtomicInteger')
@@ -390,7 +389,7 @@ class TestQldbDriver(TestCase):
         mock_client.max_pool_connections = DEFAULT_MAX_CONCURRENT_TRANSACTIONS
         qldb_driver = QldbDriver(MOCK_LEDGER_NAME)
         mock_qldb_session._is_alive = True
-        qldb_driver._release_session(mock_qldb_session)
+        self.assertTrue(qldb_driver._release_session(mock_qldb_session))
 
         mock_queue().put.assert_called_once_with(mock_qldb_session)
         mock_bounded_semaphore().release.assert_called_once_with()
@@ -409,7 +408,7 @@ class TestQldbDriver(TestCase):
         mock_client.max_pool_connections = DEFAULT_MAX_CONCURRENT_TRANSACTIONS
         qldb_driver = QldbDriver(MOCK_LEDGER_NAME)
         mock_qldb_session._is_alive = False
-        qldb_driver._release_session(mock_qldb_session)
+        self.assertFalse(qldb_driver._release_session(mock_qldb_session))
 
         mock_queue().put.assert_not_called()
         mock_bounded_semaphore().release.assert_called_once_with()
@@ -426,7 +425,7 @@ class TestQldbDriver(TestCase):
         mock_client.return_value = mock_client
         mock_client.max_pool_connections = DEFAULT_MAX_CONCURRENT_TRANSACTIONS
         qldb_driver = QldbDriver(MOCK_LEDGER_NAME)
-        qldb_driver._release_session(None)
+        self.assertFalse(qldb_driver._release_session(None))
 
         mock_queue().put.assert_not_called()
         mock_bounded_semaphore().release.assert_called_once_with()
@@ -459,27 +458,32 @@ class TestQldbDriver(TestCase):
             self.assertEqual(result, MOCK_LIST_TABLES_RESULT[count])
             count += 1
 
+    @patch('pyqldb.driver.qldb_driver.QldbDriver._release_session')
+    @patch('pyqldb.communication.session_client.SessionClient')
     @patch('pyqldb.driver.qldb_driver.client')
     @patch('pyqldb.driver.qldb_driver.QldbDriver._get_session')
-    def test_execute_lambda(self, mock_get_session, mock_client):
+    def test_execute_lambda(self, mock_get_session, mock_client, mock_session, mock_release_session):
         mock_client.return_value = mock_client
         mock_lambda = Mock()
-        mock_session = mock_get_session.return_value.__enter__.return_value
+        mock_get_session.return_value = mock_session
         mock_session._execute_lambda.return_value = MOCK_MESSAGE
 
         driver = QldbDriver(MOCK_LEDGER_NAME)
         result = driver.execute_lambda(mock_lambda)
 
+        mock_release_session.assert_called_once_with(mock_session)
         mock_get_session.assert_called_once_with(False)
         mock_session._execute_lambda.assert_called_once_with(mock_lambda)
         self.assertEqual(result, MOCK_MESSAGE)
 
+    @patch('pyqldb.driver.qldb_driver.QldbDriver._release_session')
+    @patch('pyqldb.communication.session_client.SessionClient')
     @patch('pyqldb.driver.qldb_driver.client')
     @patch('pyqldb.driver.qldb_driver.QldbDriver._get_session')
-    def test_execute_lambda_non_execute_error(self, mock_get_session, mock_client):
+    def test_execute_lambda_non_execute_error(self, mock_get_session, mock_client, mock_session, mock_release_session):
         mock_client.return_value = mock_client
         mock_lambda = Mock()
-        mock_session = mock_get_session.return_value.__enter__.return_value
+        mock_get_session.return_value = mock_session
 
         error = Exception()
         mock_session._execute_lambda.side_effect = error
@@ -487,13 +491,16 @@ class TestQldbDriver(TestCase):
 
         self.assertRaises(Exception, driver.execute_lambda, mock_lambda)
         mock_get_session.assert_called_once_with(False)
+        mock_release_session.assert_called_once_with(mock_session)
 
+    @patch('pyqldb.driver.qldb_driver.QldbDriver._release_session')
+    @patch('pyqldb.communication.session_client.SessionClient')
     @patch('pyqldb.driver.qldb_driver.client')
     @patch('pyqldb.driver.qldb_driver.QldbDriver._get_session')
-    def test_execute_lambda_non_retryable_execute_error(self, mock_get_session, mock_client):
+    def test_execute_lambda_non_retryable_execute_error(self, mock_get_session, mock_client, mock_session, mock_release_session):
         mock_client.return_value = mock_client
         mock_lambda = Mock()
-        mock_session = mock_get_session.return_value.__enter__.return_value
+        mock_get_session.return_value = mock_session
         executeError = ExecuteError(Exception(), False, False)
         mock_session._execute_lambda.side_effect = executeError
 
@@ -501,108 +508,94 @@ class TestQldbDriver(TestCase):
 
         self.assertRaises(Exception, driver.execute_lambda, mock_lambda)
         mock_get_session.assert_called_once_with(False)
+        mock_release_session.assert_called_once_with(mock_session)
 
+    @patch('pyqldb.driver.qldb_driver.QldbDriver._release_session')
+    @patch('pyqldb.communication.session_client.SessionClient')
     @patch('pyqldb.driver.qldb_driver.QldbDriver._retry_sleep')
     @patch('pyqldb.driver.qldb_driver.client')
     @patch('pyqldb.driver.qldb_driver.QldbDriver._get_session')
-    def test_execute_lambda_retryable_error_and_under_retry_limit(self, mock_get_session, mock_client, mock_retry_sleep):
+    def test_execute_lambda_retryable_error_and_under_retry_limit(self, mock_get_session, mock_client, mock_retry_sleep,
+                                                                  mock_session, mock_release_session):
         mock_client.return_value = mock_client
         mock_lambda = Mock()
-        mock_session = mock_get_session.return_value.__enter__.return_value
+        mock_get_session.return_value = mock_session
         inner_error = Exception()
         retryable_execute_error = ExecuteError(inner_error, True, False, DEFAULT_TRANSACTION_ID)
         mock_session._execute_lambda.side_effect = [retryable_execute_error, MOCK_MESSAGE]
-
+        mock_release_session.return_value = True
         driver = QldbDriver(MOCK_LEDGER_NAME)
         result = driver.execute_lambda(mock_lambda)
 
         self.assertEqual(result, MOCK_MESSAGE)
 
-        mock_get_session.assert_has_calls([call(False), call(False)], any_order=True)
+        mock_get_session.assert_has_calls([call(False), call(False)])
+        mock_release_session.assert_has_calls([call(mock_session), call(mock_session)])
         mock_retry_sleep.assert_called_once_with(driver._retry_config, 1, inner_error, DEFAULT_TRANSACTION_ID)
         self.assertEqual(mock_session._execute_lambda.call_count, 2)
 
+    @patch('pyqldb.driver.qldb_driver.QldbDriver._release_session')
+    @patch('pyqldb.communication.session_client.SessionClient')
     @patch('pyqldb.driver.qldb_driver.QldbDriver._retry_sleep')
     @patch('pyqldb.driver.qldb_driver.client')
     @patch('pyqldb.driver.qldb_driver.QldbDriver._get_session')
-    def test_execute_lambda_retryable_error_and_exceed_retry_limit(self, mock_get_session, mock_client, mock_retry_sleep):
+    def test_execute_lambda_retryable_error_and_exceed_retry_limit(self, mock_get_session, mock_client, mock_retry_sleep,
+                                                                   mock_session, mock_release_session):
         mock_client.return_value = mock_client
         mock_lambda = Mock()
-        mock_session = mock_get_session.return_value.__enter__.return_value
+        mock_get_session.return_value = mock_session
         inner_error = Exception()
         retryable_execute_error = ExecuteError(inner_error, True, False, DEFAULT_TRANSACTION_ID)
         mock_session._execute_lambda.side_effect = [retryable_execute_error, retryable_execute_error, retryable_execute_error]
+        mock_release_session.return_value = True
 
         retryConfig = RetryConfig(retry_limit=2)
         driver = QldbDriver(MOCK_LEDGER_NAME, retry_config=retryConfig)
 
         self.assertRaises(Exception, driver.execute_lambda, mock_lambda)
-        mock_get_session.assert_has_calls([call(False), call(False), call(False)], any_order=True)
+        mock_get_session.assert_has_calls([call(False), call(False), call(False)])
+        mock_release_session.assert_has_calls([call(mock_session), call(mock_session), call(mock_session)])
         mock_retry_sleep.assert_has_calls([call(driver._retry_config, 1, inner_error, DEFAULT_TRANSACTION_ID),
                                            call(driver._retry_config, 2, inner_error, DEFAULT_TRANSACTION_ID)])
         self.assertEqual(mock_session._execute_lambda.call_count, 3)
 
+    @patch('pyqldb.driver.qldb_driver.QldbDriver._release_session')
+    @patch('pyqldb.communication.session_client.SessionClient')
     @patch('pyqldb.driver.qldb_driver.QldbDriver._retry_sleep')
     @patch('pyqldb.driver.qldb_driver.client')
     @patch('pyqldb.driver.qldb_driver.QldbDriver._get_session')
     def test_execute_lambda_invalid_session_exception_and_0_retry_limit(self, mock_get_session, mock_client,
-                                                                        mock_retry_sleep):
+                                                                        mock_retry_sleep, mock_session, mock_release_session):
         mock_client.return_value = mock_client
         mock_lambda = Mock()
-        mock_session = mock_get_session.return_value.__enter__.return_value
+        mock_get_session.return_value = mock_session
         invalid_session_exception = ExecuteError(Exception(), True, True)
         mock_session._execute_lambda.side_effect = [invalid_session_exception, MOCK_MESSAGE]
+        mock_release_session.return_value = True
 
         retryConfig = RetryConfig(retry_limit=0)
         driver = QldbDriver(MOCK_LEDGER_NAME, retry_config=retryConfig)
         result = driver.execute_lambda(mock_lambda)
 
         self.assertEqual(result, MOCK_MESSAGE)
-        mock_get_session.assert_has_calls([call(False), call(False)], any_order=True)
+        mock_get_session.assert_has_calls([call(False), call(False)])
+        mock_release_session.assert_has_calls([call(mock_session), call(mock_session)])
         mock_retry_sleep.assert_not_called()
         self.assertEqual(mock_session._execute_lambda.call_count, 2)
 
+    @patch('pyqldb.driver.qldb_driver.QldbDriver._release_session')
     @patch('pyqldb.driver.qldb_driver.client')
     @patch('pyqldb.driver.qldb_driver.QldbDriver._get_session')
-    def test_execute_lambda_retryable_error_and_session_is_none(self, mock_get_session, mock_client):
+    def test_execute_lambda_retryable_error_and_session_is_none(self, mock_get_session, mock_client, mock_release_session):
         mock_client.return_value = mock_client
         mock_lambda = Mock()
         retryable_exception = ExecuteError(Exception(), True, True)
-        mock_get_session.return_value.__enter__.side_effect = retryable_exception
+        mock_get_session.side_effect = retryable_exception
+        mock_release_session.return_value = False
 
         retryConfig = RetryConfig(retry_limit=2)
         driver = QldbDriver(MOCK_LEDGER_NAME, retry_config=retryConfig)
 
         self.assertRaises(Exception, driver.execute_lambda, mock_lambda)
-        mock_get_session.assert_has_calls([call(False), call(True)], any_order=True)
-
-    @patch('pyqldb.driver.qldb_driver.client')
-    @patch('pyqldb.driver.qldb_driver.QldbDriver._get_session')
-    def test_execute_lambda_retryable_error_and_session_is_alive(self, mock_get_session, mock_client):
-        mock_client.return_value = mock_client
-        mock_lambda = Mock()
-        mock_session = mock_get_session.return_value.__enter__.return_value
-        retryable_exception = ExecuteError(Exception(), True, True)
-        mock_session._execute_lambda.side_effect = retryable_exception
-
-        retryConfig = RetryConfig(retry_limit=2)
-        driver = QldbDriver(MOCK_LEDGER_NAME, retry_config=retryConfig)
-
-        self.assertRaises(Exception, driver.execute_lambda, mock_lambda)
-        mock_get_session.assert_has_calls([call(False), call(False)], any_order=True)
-
-    @patch('pyqldb.driver.qldb_driver.client')
-    @patch('pyqldb.driver.qldb_driver.QldbDriver._get_session')
-    def test_execute_lambda_retryable_error_and_session_is_not_alive(self, mock_get_session, mock_client):
-        mock_client.return_value = mock_client
-        mock_lambda = Mock()
-        mock_session = mock_get_session.return_value.__enter__.return_value
-        retryable_exception = ExecuteError(Exception(), True, True)
-        mock_session._execute_lambda.side_effect = retryable_exception
-        mock_session._is_alive = False
-
-        retryConfig = RetryConfig(retry_limit=2)
-        driver = QldbDriver(MOCK_LEDGER_NAME, retry_config=retryConfig)
-
-        self.assertRaises(Exception, driver.execute_lambda, mock_lambda)
-        mock_get_session.assert_has_calls([call(False), call(True)], any_order=True)
+        mock_get_session.assert_has_calls([call(False), call(True)])
+        mock_release_session.assert_has_calls([call(None)])
