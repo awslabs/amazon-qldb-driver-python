@@ -10,22 +10,21 @@
 # and limitations under the License.
 from queue import Queue, Empty
 from logging import getLogger
+from time import sleep
 from threading import BoundedSemaphore
 from warnings import warn
 
 from boto3 import client
 from boto3.session import Session
 from botocore.config import Config
-from botocore.exceptions import ClientError
-from pyqldb.config.retry_config import RetryConfig
 
 from .. import __version__
 from ..communication.session_client import SessionClient
-
-from ..errors import DriverClosedError, SessionPoolEmptyError, is_invalid_session_exception, \
-    is_transaction_expired_exception
+from ..config.retry_config import RetryConfig
+from ..errors import ExecuteError, DriverClosedError, SessionPoolEmptyError
 from ..session.qldb_session import QldbSession
 from ..util.atomic_integer import AtomicInteger
+from ..util.retry import Retry
 
 POOL_TIMEOUT_SECONDS = 0.001
 logger = getLogger(__name__)
@@ -182,9 +181,12 @@ class QldbDriver:
         Close the driver and any sessions in the pool.
         """
         self._is_closed = True
-        while not self._pool.empty():
-            cur_session = self._pool.get_nowait()
-            cur_session._end_session()
+        while True:
+            try:
+                cur_session = self._pool.get_nowait()
+                cur_session._end_session()
+            except Empty:
+                return
 
     def list_tables(self):
         """
@@ -203,7 +205,8 @@ class QldbDriver:
 
     def execute_lambda(self, query_lambda, retry_config=None):
         """
-        Execute the lambda function against QLDB within a transaction and retrieve the result.
+        Execute the lambda function against QLDB within a transaction and retrieve the result. It will retry up to the
+        retry limit if an OCC conflict or retryable exception occurs.
         This is the primary method to execute a transaction against Amazon QLDB ledger.
 
         :type query_lambda: function
@@ -234,25 +237,39 @@ class QldbDriver:
 
         :raises LambdaAbortedError: If the lambda function calls :py:class:`pyqldb.execution.executor.Executor.abort`.
         """
+        if self._is_closed:
+            raise DriverClosedError
 
         retry_config = self._retry_config if retry_config is None else retry_config
-        context = _LambdaExecutionContext()
-        get_session_attempt = 0
+
+        start_new_session = False
+        session = None
+        retry_attempt = 0
+
         while True:
             try:
-                get_session_attempt = get_session_attempt + 1
-                with self._get_session() as session:
-                    return session._execute_lambda(query_lambda, retry_config, context)
-            except ClientError as ce:
-                if get_session_attempt >= self._pool_limit + 3:
-                    raise ce
+                retry_attempt += 1
+                session = self._get_session(start_new_session)
+                return session._execute_lambda(query_lambda)
+            except Exception as e:
+                if isinstance(e, ExecuteError):
+                    if e.is_retryable:
+                        # Always retry on the first attempt if failure was caused by a stale session in the pool.
+                        if retry_attempt == 1 and e.is_invalid_session_exception:
+                            continue
 
-                if is_transaction_expired_exception(ce):
-                    raise ce
-                if is_invalid_session_exception(ce):
-                    pass
+                        if retry_attempt > retry_config.retry_limit:
+                            raise e.error
+
+                        self._retry_sleep(retry_config, retry_attempt, e.error, e.transaction_id)
+                        logger.info('A recoverable error has occurred. Attempting retry #{}'.format(retry_attempt))
+                        logger.debug('Error cause: {}'.format(e.error))
+                    else:
+                        raise e.error
                 else:
-                    raise ce
+                    raise e
+            finally:
+                start_new_session = not self._release_session(session)
 
     @property
     def read_ahead(self):
@@ -279,71 +296,63 @@ class QldbDriver:
         Create a new QldbSession object.
         """
         session_client = SessionClient._start_session(self._ledger_name, self._client)
-        return QldbSession(session_client, self._read_ahead, self._executor, self._release_session)
+        return QldbSession(session_client, self._read_ahead, self._executor)
 
     def _release_session(self, session):
         """
         Release a session back into the pool.
         """
+        if session:
+            self._pool_permits.release()
+            self._pool_permits_counter.increment()
 
-        if not session._is_closed:
-            self._pool.put(session)
+            if session._is_alive:
+                self._pool.put(session)
+                logger.debug('Number of sessions in pool : {}'.format(self._pool.qsize()))
+                return True
+        return False
 
-        self._pool_permits.release()
-        self._pool_permits_counter.increment()
-        logger.debug('Number of sessions in pool : {}'.format(self._pool.qsize()))
-
-    def _get_session(self):
+    def _get_session(self, start_new_session):
         """
         This method will attempt to retrieve an active, existing session, or it will start a new session with QLDB if
         none are available and the session pool limit has not been reached. If the pool limit has been reached, it will
         attempt to retrieve a session from the pool until the timeout is reached.
 
+        :type start_new_session: bool
+        :param start_new_session: A boolean value to determine whether to start a new session or retrieve a session from
+                                  the session pool.
+
         :rtype: :py:class:`pyqldb.session.qldb_session.QldbSession`
         :return: A QldbSession object.
 
+        :raises ExecuteError: Error containing the context of a failure during start new session.
+
         :raises SessionPoolEmptyError: If the timeout is reached while attempting to retrieve a session.
-
-        :raises DriverClosedError: When this driver is closed.
         """
-        if self._is_closed:
-            raise DriverClosedError
-
         logger.debug('Getting session. Current free session count: {}. Current available permit count: {}.'.format(
             self._pool.qsize(), self._pool_permits_counter.value))
+
         if self._pool_permits.acquire(timeout=self._timeout):
             self._pool_permits_counter.decrement()
+
             try:
-                try:
-                    cur_session = self._pool.get_nowait()
-                    logger.debug('Reusing session from pool. Session ID: {}.'.format(cur_session.session_id))
-                    return cur_session
-                except Empty:
-                    pass
+                if not start_new_session:
+                    try:
+                        session = self._pool.get_nowait()
+                        logger.debug('Reusing session from pool. Session ID: {}.'.format(session.session_id))
+                        return session
+                    except Empty:
+                        pass
 
                 logger.debug('Creating new session.')
                 return self._create_new_session()
             except Exception as e:
-                # If they don't get a session they don't use a permit!
                 self._pool_permits.release()
                 self._pool_permits_counter.increment()
-                raise e
+                raise ExecuteError(e, True, True)
         else:
             raise SessionPoolEmptyError(self._timeout)
 
-
-class _LambdaExecutionContext:
-    """
-    The class is used for storing execution context across a lifespan of a lambda (including
-    retries due to session expiry).
-    The class is purely meant for internal use.
-    """
-    def __init__(self):
-        self._execution_attempt = 0
-
-    def increment_execution_attempt(self):
-        self._execution_attempt += 1
-
-    @property
-    def execution_attempt(self):
-        return self._execution_attempt
+    @staticmethod
+    def _retry_sleep(retry_config, execution_attempt, error, transaction_id):
+        sleep(Retry.calculate_backoff(retry_config, execution_attempt, error, transaction_id) / 1000)

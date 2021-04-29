@@ -55,8 +55,6 @@ class Executor:
 
         :rtype: :py:class:`pyqldb.cursor.stream_cursor.StreamCursor`
         :return: Cursor on the result set of the statement.
-
-        :raises TransactionClosedError: When this transaction is closed.
         """
         cursor = self._transaction._execute_statement(statement, *parameters)
         return cursor
