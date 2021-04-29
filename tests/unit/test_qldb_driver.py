@@ -412,7 +412,7 @@ class TestQldbDriver(TestCase):
         mock_queue().put.assert_not_called()
         mock_bounded_semaphore().release.assert_called_once_with()
         mock_atomic_integer().increment.assert_called_once_with()
-        mock_logger_debug.assert_called_once()
+        mock_logger_debug.assert_not_called()
 
     @patch('pyqldb.driver.qldb_driver.AtomicInteger')
     @patch('pyqldb.driver.qldb_driver.BoundedSemaphore')

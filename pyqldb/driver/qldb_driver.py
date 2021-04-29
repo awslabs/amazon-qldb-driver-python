@@ -305,10 +305,10 @@ class QldbDriver:
         if session:
             self._pool_permits.release()
             self._pool_permits_counter.increment()
-            logger.debug('Number of sessions in pool : {}'.format(self._pool.qsize()))
 
             if session._is_alive:
                 self._pool.put(session)
+                logger.debug('Number of sessions in pool : {}'.format(self._pool.qsize()))
                 return True
         return False
 
