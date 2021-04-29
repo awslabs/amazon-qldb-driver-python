@@ -6,6 +6,8 @@ to write software that makes use of AmazonQLDB.
 [![Latest Version](https://img.shields.io/pypi/v/pyqldb.svg)](https://pypi.python.org/pypi/pyqldb)
 [![Documentation Status](https://readthedocs.org/projects/amazon-qldb-driver-python/badge/?version=latest)](https://amazon-qldb-driver-python.readthedocs.io/en/latest/?badge=latest)
 [![Build Status](https://github.com/awslabs/amazon-qldb-driver-python/workflows/Python%20application/badge.svg)](https://github.com/awslabs/amazon-qldb-driver-python/actions?query=workflow%3A%22Python+application%22)
+[![GitHub license](docs/static/apache2.svg)](./LICENSE)
+![aws provider](https://img.shields.io/badge/provider-AWS-orange?logo=amazon-aws&color=ff9900)
 
 For our tutorial, see [Python and Amazon QLDB](https://docs.aws.amazon.com/qldb/latest/developerguide/getting-started.python.html).
 
