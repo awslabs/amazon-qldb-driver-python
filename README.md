@@ -90,8 +90,6 @@ $ pytest tests/integration
 Sphinx is used for documentation. You can generate HTML locally with the following:
 
 ```
-$ pip install -r requirements-docs.txt
-$ pip install -e .
 $ cd docs
 $ make html
 ```
