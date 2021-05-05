@@ -50,7 +50,7 @@ for table in qldb_driver.list_tables():
 ### See Also
 
 1. [Getting Started with Amazon QLDB Python Driver](https://amazon-qldb-driver-python.readthedocs.io/en/stable/guide/getting_started.html) A guide that gets you started with executing transactions with the QLDB Python driver.
-2. [QLDB Python Driver Cookbook](https://amazon-qldb-driver-python.readthedocs.io/en/stable/guide/cookbook.html) The cookbook provides code samples for some simple QLDB Python driver use cases. 
+2. [QLDB Python Driver Cookbook](https://docs.aws.amazon.com/qldb/latest/developerguide/driver-cookbook-python.html) The cookbook provides code samples for some simple QLDB Python driver use cases. 
 3. [Amazon QLDB Python Driver Tutorial](https://docs.aws.amazon.com/qldb/latest/developerguide/getting-started.python.tutorial.html): In this tutorial, you use the QLDB Driver for Python to create an Amazon QLDB ledger and populate it with tables and sample data.
 4. [Amazon QLDB Python Driver Samples](https://github.com/aws-samples/amazon-qldb-dmv-sample-python): A DMV based example application which demonstrates how to use QLDB with the QLDB Driver for Python.
 5. QLDB Python driver accepts and returns [Amazon ION](http://amzn.github.io/ion-docs/) Documents. Amazon Ion is a richly-typed, self-describing, hierarchical data serialization format offering interchangeable binary and text representations. For more information read the [ION docs](https://readthedocs.org/projects/ion-python/).
