@@ -29,6 +29,8 @@ Please see the link below for more detail to install Python:
 
 ## Getting Started
 
+Please see the [Quickstart guide for the Amazon QLDB Driver for Python](https://docs.aws.amazon.com/qldb/latest/developerguide/driver-quickstart-python.html).
+
 First, install the driver using pip:
 
 ```pip install pyqldb```
