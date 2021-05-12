@@ -139,19 +139,13 @@ class TestStatementExecution(TestCase):
         search_query = "SELECT VALUE indexes[0] FROM information_schema.user_tables WHERE status = 'ACTIVE' " \
                        "AND name = '{}'".format(TABLE_NAME)
 
-        def execute_statement_and_return_index_value(txn, query):
-            cursor = txn.execute_statement(query)
-            # Extract the index name by quering the information_schema.
-            # This gives:
-            # {
-            #    expr: "[MyColumn]"
-            # }
-            for row in cursor:
-                return row['expr']
-
-        value = self.qldb_driver.execute_lambda(lambda txn:
-                                                execute_statement_and_return_index_value(txn, search_query))
-        self.assertEqual("[" + INDEX_ATTRIBUTE + "]", value)
+        cursor = self.qldb_driver.execute_lambda(lambda txn: txn.execute_statement(search_query))
+        # Extract the index name by quering the information_schema.
+        # This gives:
+        # {
+        #    expr: "[MyColumn]"
+        # }
+        self.assertEqual("[" + INDEX_ATTRIBUTE + "]", next(cursor)['expr'])
 
     def test_returns_empty_when_no_records_are_found(self):
         # Given.
@@ -381,18 +375,13 @@ class TestStatementExecution(TestCase):
         self.assertEqual(1, count)
 
         # Then.
-        def execute_count_statement_and_return_count(txn):
-            search_query = "SELECT COUNT(*) FROM {}".format(TABLE_NAME)
-            # This gives:
-            # {
-            #    _1: 1
-            # }
-            cursor = txn.execute_statement(search_query)
-            for row in cursor:
-                return row['_1']
-
-        count = self.qldb_driver.execute_lambda(lambda txn: execute_count_statement_and_return_count(txn))
-        self.assertEqual(0, count)
+        cursor = self.qldb_driver.execute_lambda(lambda txn: txn.execute_statement(
+            "SELECT COUNT(*) FROM {}".format(TABLE_NAME)))
+        # This gives:
+        # {
+        #    _1: 1
+        # }
+        self.assertEqual(0, next(cursor)['_1'])
 
     def test_delete_all_documents(self):
         # Given.
@@ -428,18 +417,13 @@ class TestStatementExecution(TestCase):
         self.assertEqual(2, count)
 
         # Then.
-        def execute_count_statement_and_return_count(txn):
-            search_query = "SELECT COUNT(*) FROM {}".format(TABLE_NAME)
-            # This gives:
-            # {
-            #    _1: 1
-            # }
-            cursor = txn.execute_statement(search_query)
-            for row in cursor:
-                return row['_1']
-
-        count = self.qldb_driver.execute_lambda(lambda txn: execute_count_statement_and_return_count(txn))
-        self.assertEqual(0, count)
+        cursor = self.qldb_driver.execute_lambda(lambda txn: txn.execute_statement(
+            "SELECT COUNT(*) FROM {}".format(TABLE_NAME)))
+        # This gives:
+        # {
+        #    _1: 1
+        # }
+        self.assertEqual(0, next(cursor)['_1'])
 
     def test_occ_exception_is_thrown(self):
         # Create driver with zero retry limit to trigger OCC exception.
