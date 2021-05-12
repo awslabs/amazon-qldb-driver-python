@@ -139,18 +139,13 @@ class TestStatementExecution(TestCase):
         search_query = "SELECT VALUE indexes[0] FROM information_schema.user_tables WHERE status = 'ACTIVE' " \
                        "AND name = '{}'".format(TABLE_NAME)
 
-        def execute_statement_and_return_index_value(txn, query):
-            cursor = txn.execute_statement(query)
-            # Extract the index name by quering the information_schema.
-            # This gives:
-            # {
-            #    expr: "[MyColumn]"
-            # }
-            return next(cursor)['expr']
-
-        value = self.qldb_driver.execute_lambda(lambda txn:
-                                                execute_statement_and_return_index_value(txn, search_query))
-        self.assertEqual("[" + INDEX_ATTRIBUTE + "]", value)
+        cursor = self.qldb_driver.execute_lambda(lambda txn: txn.execute_statement(search_query))
+        # Extract the index name by quering the information_schema.
+        # This gives:
+        # {
+        #    expr: "[MyColumn]"
+        # }
+        self.assertEqual("[" + INDEX_ATTRIBUTE + "]", next(cursor)['expr'])
 
     def test_returns_empty_when_no_records_are_found(self):
         # Given.
@@ -193,10 +188,6 @@ class TestStatementExecution(TestCase):
         search_query = "SELECT VALUE {} FROM {} WHERE {} = ?".format(COLUMN_NAME, TABLE_NAME, COLUMN_NAME)
         ion_string = loads(dumps(SINGLE_DOCUMENT_VALUE))
 
-        def execute_statement_and_return_value(txn, query, *parameters):
-            cursor = txn.execute_statement(query, *parameters)
-            return next(cursor)
-
         value = self.qldb_driver.execute_lambda(
             lambda txn: execute_statement_and_return_value(txn, search_query, ion_string))
         self.assertEqual(SINGLE_DOCUMENT_VALUE, value)
@@ -221,10 +212,6 @@ class TestStatementExecution(TestCase):
 
         search_query = "SELECT VALUE {} FROM {} WHERE {} = ?".format(COLUMN_NAME, TABLE_NAME, COLUMN_NAME)
         ion_string = loads(dumps(SINGLE_DOCUMENT_VALUE))
-
-        def execute_statement_and_return_value(txn, query, *parameters):
-            cursor = txn.execute_statement(query, *parameters)
-            return next(cursor)
 
         # When.
         value = self.qldb_driver.execute_lambda(
@@ -253,10 +240,6 @@ class TestStatementExecution(TestCase):
 
         search_query = "SELECT VALUE {} FROM \"{}\" WHERE {} = ?".format(COLUMN_NAME, TABLE_NAME, COLUMN_NAME)
         ion_string = loads(dumps(SINGLE_DOCUMENT_VALUE))
-
-        def execute_statement_and_return_value(txn, query, *parameters):
-            cursor = txn.execute_statement(query, *parameters)
-            return next(cursor)
 
         # When.
         value = self.qldb_driver.execute_lambda(
@@ -392,17 +375,13 @@ class TestStatementExecution(TestCase):
         self.assertEqual(1, count)
 
         # Then.
-        def execute_count_statement_and_return_count(txn):
-            search_query = "SELECT COUNT(*) FROM {}".format(TABLE_NAME)
-            # This gives:
-            # {
-            #    _1: 1
-            # }
-            cursor = txn.execute_statement(search_query)
-            return next(cursor)['_1']
-
-        count = self.qldb_driver.execute_lambda(lambda txn: execute_count_statement_and_return_count(txn))
-        self.assertEqual(0, count)
+        cursor = self.qldb_driver.execute_lambda(lambda txn: txn.execute_statement(
+            "SELECT COUNT(*) FROM {}".format(TABLE_NAME)))
+        # This gives:
+        # {
+        #    _1: 1
+        # }
+        self.assertEqual(0, next(cursor)['_1'])
 
     def test_delete_all_documents(self):
         # Given.
@@ -438,17 +417,13 @@ class TestStatementExecution(TestCase):
         self.assertEqual(2, count)
 
         # Then.
-        def execute_count_statement_and_return_count(txn):
-            search_query = "SELECT COUNT(*) FROM {}".format(TABLE_NAME)
-            # This gives:
-            # {
-            #    _1: 1
-            # }
-            cursor = txn.execute_statement(search_query)
-            return next(cursor)['_1']
-
-        count = self.qldb_driver.execute_lambda(lambda txn: execute_count_statement_and_return_count(txn))
-        self.assertEqual(0, count)
+        cursor = self.qldb_driver.execute_lambda(lambda txn: txn.execute_statement(
+            "SELECT COUNT(*) FROM {}".format(TABLE_NAME)))
+        # This gives:
+        # {
+        #    _1: 1
+        # }
+        self.assertEqual(0, next(cursor)['_1'])
 
     def test_occ_exception_is_thrown(self):
         # Create driver with zero retry limit to trigger OCC exception.
@@ -506,10 +481,6 @@ class TestStatementExecution(TestCase):
                     lambda txn: execute_statement_and_return_count(txn, query, ion_struct))
                 self.assertEqual(1, count)
 
-                def execute_statement_and_return_value(txn, query, *parameters):
-                    cursor = txn.execute_statement(query, *parameters)
-                    return next(cursor)
-
                 # Then.
                 if isinstance(ion_value, IonPyNull):
                     search_query = "SELECT VALUE {} FROM {} WHERE {} IS NULL".format(COLUMN_NAME, TABLE_NAME,
@@ -560,10 +531,6 @@ class TestStatementExecution(TestCase):
                                                                                            ion_value))
                 self.assertEqual(1, count)
 
-                def execute_statement_and_return_value(txn, query, *parameters):
-                    cursor = txn.execute_statement(query, *parameters)
-                    return next(cursor)
-
                 # Then.
                 if isinstance(ion_value, IonPyNull):
                     search_query = "SELECT VALUE {} FROM {} WHERE {} IS NULL".format(COLUMN_NAME, TABLE_NAME,
@@ -594,10 +561,6 @@ class TestStatementExecution(TestCase):
         search_query = "SELECT VALUE {} FROM {} WHERE {} = ?".format(COLUMN_NAME, TABLE_NAME, COLUMN_NAME)
         ion_string = loads(dumps(SINGLE_DOCUMENT_VALUE))
 
-        def execute_statement_and_return_value(txn, query, *parameters):
-            cursor = txn.execute_statement(query, *parameters)
-            return next(cursor)
-
         value = self.qldb_driver.execute_lambda(
             lambda txn: execute_statement_and_return_value(txn, search_query, ion_string))
         self.assertEqual(SINGLE_DOCUMENT_VALUE, value)
@@ -617,6 +580,7 @@ class TestStatementExecution(TestCase):
 
         # When.
         self.assertRaises(ClientError, self.qldb_driver.execute_lambda, lambda executor: query_lambda(executor))
+
 
 def create_ion_values():
     ion_values = list()
@@ -726,3 +690,9 @@ def create_ion_values():
     ion_values.append(ion_null_timestamp_with_annotation)
 
     return ion_values
+
+
+def execute_statement_and_return_value(txn, query, *parameters):
+    cursor = txn.execute_statement(query, *parameters)
+    for row in cursor:
+        return row
