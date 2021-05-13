@@ -8,7 +8,6 @@ This release is focused on improving the retry logic, optimizing it and handling
    * `boto3` and `botocore` bumped to `1.17.5` and `1.20.5` respectively, which gives visibility to [CapacityExceededException](https://docs.aws.amazon.com/qldb/latest/developerguide/driver-errors.html).
 
 #### Bug Fixes:
-
 * Fixed attribute error when retrieving the `retry_limit` property on QldbDriver.
 
 ### Release 3.1.0
