@@ -9,7 +9,7 @@ This release is focused on improving the retry logic, optimizing it and handling
 
 #### Bug Fixes:
 
-* Fixed attribute error when retrieving the `retry_limit` property on QldbDriver
+* Fixed attribute error when retrieving the `retry_limit` property on QldbDriver.
 
 ### Release 3.1.0
 Add support for obtaining basic server-side statistics on individual statement executions.
