@@ -1,3 +1,9 @@
+### Release 3.2.1
+This release is to update ionhash Python package from 1.1.0 to 1.2.0.
+
+#### Bug Fixes:
+* Fixed bug which leads to attributeError when using plain python strings in QLDB driver.
+
 ### Release 3.2.0
 This release is focused on improving the retry logic, optimizing it and handling more possible failures.
 
