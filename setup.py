@@ -17,7 +17,7 @@ VERSION_RE = re.compile(r'''__version__ = ['"]([0-9.a-z\-]+)['"]''')
 requires = ['amazon.ion>=0.7.0,<1',
             'boto3>=1.17.5,<2',
             'botocore>=1.20.5,<2',
-            'ionhash>=1.2.0,<2']
+            'ionhash>=1.2.1,<2']
 
 
 def get_version():

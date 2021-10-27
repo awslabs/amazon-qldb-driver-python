@@ -1,3 +1,11 @@
+### Release 3.2.2
+
+This release is to update ionhash Python package from 1.2.0 to 1.2.1.
+
+#### :tada: Enhancements
+
+- The Ion hash performance is hugely improved, and the informal benchmark result is in https://github.com/amzn/ion-hash-python/pull/22
+
 ### Release 3.2.1
 This release is to update ionhash Python package from 1.1.0 to 1.2.0.
 
