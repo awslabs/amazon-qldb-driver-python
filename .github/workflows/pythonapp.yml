@@ -47,4 +47,6 @@ jobs:
       run: |
         pip install pytest
         pytest tests/unit
-        pytest tests/integration --ledger_suffix ${{ matrix.python-version }}-${{ matrix.os }}
+        GITHUB_SHA_SHORT=$(git rev-parse --short $GITHUB_SHA)
+        pytest tests/integration --ledger_suffix ${{ strategy.job-index }}-$GITHUB_SHA_SHORT
+      shell: bash
