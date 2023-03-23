@@ -14,7 +14,7 @@ import setuptools
 
 ROOT = os.path.join(os.path.dirname(__file__), 'pyqldb')
 VERSION_RE = re.compile(r'''__version__ = ['"]([0-9.a-z\-]+)['"]''')
-requires = ['amazon.ion>=0.7.0,<1',
+requires = ['amazon.ion>=0.7.0,<=0.9.3',
             'boto3>=1.17.5,<2',
             'botocore>=1.20.5,<2',
             'ionhash>=1.2.1,<2']
