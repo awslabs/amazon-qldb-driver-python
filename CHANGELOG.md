@@ -1,3 +1,10 @@
+### Release 3.2.3
+
+This release pins the Amazon Ion library to a compatible version.
+
+#### Bug Fixes:
+* Pinned the version of amazon.ion to 0.9.3, as later versions are incompatible with this driver.
+
 ### Release 3.2.2
 
 This release is to update ionhash Python package from 1.2.0 to 1.2.1.
