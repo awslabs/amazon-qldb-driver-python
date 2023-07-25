@@ -1,5 +1,5 @@
 amazon.ion~=0.9.3
-boto3~=1.26.37
+boto3~=1.28.11
 botocore~=1.29.37
 ionhash~=1.2.1
 pytest~=7.2.2
