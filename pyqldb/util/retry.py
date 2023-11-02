@@ -37,6 +37,6 @@ class Retry:
     def _get_delay_with_equal_jitter(retry_attempt, retry_config):
         capped_retries = min(retry_attempt, MAX_POW)
         delay_seed = min(retry_config.base * (1 << capped_retries), MAX_BACKOFF)
-        delay = delay_seed / 2 + random.randint(0, delay_seed / 2)
+        delay = delay_seed / 2 + random.randint(0, int(delay_seed / 2))
 
         return delay
