@@ -30,7 +30,7 @@ class TestSessionManagement(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        cls.integration_test_base.delete_ledger()
+        cls.integration_test_base.force_delete_ledger()
 
     def test_connect_to_non_existent_ledger(self):
         with self.integration_test_base.qldb_driver("nonExistentLedger") as qldb_driver:
