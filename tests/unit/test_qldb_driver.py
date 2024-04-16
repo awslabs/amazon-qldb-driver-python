@@ -433,7 +433,9 @@ class TestQldbDriver(TestCase):
         driver = QldbDriver(MOCK_LEDGER_NAME)
         self.assertEqual(driver.read_ahead, driver._read_ahead)
 
-    def test_get_retry_limit(self):
+    @patch('pyqldb.driver.qldb_driver.client')
+    def test_get_retry_limit(self, mock_client):
+        mock_client.return_value = mock_client
         retry_limit = 4
         retry_config = RetryConfig(retry_limit=retry_limit)
         driver = QldbDriver(MOCK_LEDGER_NAME, retry_config=retry_config)
