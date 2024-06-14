@@ -32,14 +32,19 @@ class IntegrationTestBase:
     def force_delete_ledger(self):
         try:
             logger.info("Deleting ledger %s", self.ledger_name)
-            self.qldb.update_ledger(Name=self.ledger_name, DeletionProtection=False)
             self.delete_ledger()
-        except ClientError as ce:
-            logger.warning("Encountered an error while force deleting ledger %s: %s", self.ledger_name, ce)
+        except (self.qldb.exceptions.ResourceInUseException, self.qldb.exceptions.ResourcePreconditionNotMetException) as e:
+            logger.warning(e)
+            # Test deleting state
+            self.wait_for_active()
+            self.delete_ledger()
 
     def delete_ledger(self):
         logger.info("Deleting ledger %s", self.ledger_name)
-        self.qldb.update_ledger(Name=self.ledger_name, DeletionProtection=False)
+        try:
+            self.qldb.update_ledger(Name=self.ledger_name, DeletionProtection=False)
+        except self.qldb.exceptions.ResourceNotFoundException:
+            return
         self.qldb.delete_ledger(Name=self.ledger_name)
         self.wait_for_deletion()
 
